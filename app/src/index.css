@@ -1,0 +1,290 @@
+/* ============================================================
+   UbuntuOS — Global Styles & Design Tokens
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Dark mode (default) */
+    --bg-desktop: #1E1E1E;
+    --bg-panel: #2D2D2D;
+    --bg-window: #242424;
+    --bg-window-active: #2A2A2A;
+    --bg-titlebar: #1A1A1A;
+    --bg-app-grid: rgba(30,30,30,0.95);
+    --bg-context-menu: #2D2D2D;
+    --bg-notification: #2D2D2D;
+    --bg-tooltip: #1A1A1A;
+    --bg-input: #1A1A1A;
+    --bg-hover: rgba(255,255,255,0.08);
+    --bg-active: rgba(255,255,255,0.12);
+    --bg-selected: rgba(124,77,255,0.15);
+
+    --accent-primary: #7C4DFF;
+    --accent-primary-hover: #9575FF;
+    --accent-primary-active: #673AB7;
+    --accent-secondary: #FF9800;
+    --accent-secondary-hover: #FFB74D;
+    --accent-success: #4CAF50;
+    --accent-error: #F44336;
+    --accent-warning: #FF9800;
+    --accent-info: #2196F3;
+
+    --text-primary: #E0E0E0;
+    --text-secondary: #9E9E9E;
+    --text-disabled: #616161;
+    --text-inverse: #212121;
+
+    --border-subtle: rgba(255,255,255,0.06);
+    --border-default: rgba(255,255,255,0.10);
+    --border-focus: #7C4DFF;
+
+    --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+    --shadow-xl: 0 16px 48px rgba(0,0,0,0.6);
+
+    --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+    --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-smooth: cubic-bezier(0.25, 0.1, 0.25, 1);
+
+    --duration-instant: 50ms;
+    --duration-fast: 150ms;
+    --duration-normal: 250ms;
+    --duration-slow: 400ms;
+    --duration-slower: 600ms;
+
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-full: 9999px;
+  }
+
+  /* Light mode */
+  .light {
+    --bg-desktop: #FAFAFA;
+    --bg-panel: #FFFFFF;
+    --bg-window: #FFFFFF;
+    --bg-titlebar: #F0F0F0;
+    --bg-app-grid: rgba(250,250,250,0.95);
+    --bg-context-menu: #FFFFFF;
+    --bg-input: #F5F5F5;
+    --bg-hover: rgba(0,0,0,0.06);
+    --bg-active: rgba(0,0,0,0.10);
+    --bg-selected: rgba(124,77,255,0.10);
+
+    --text-primary: #212121;
+    --text-secondary: #757575;
+    --text-disabled: #BDBDBD;
+
+    --border-subtle: rgba(0,0,0,0.06);
+    --border-default: rgba(0,0,0,0.10);
+
+    --shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.10);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+    --shadow-xl: 0 16px 48px rgba(0,0,0,0.15);
+  }
+
+  /* === Color Themes === */
+  .theme-nord {
+    --bg-desktop: #2E3440;
+    --bg-panel: #3B4252;
+    --bg-window: #2E3440;
+    --bg-titlebar: #272C36;
+    --bg-context-menu: #3B4252;
+    --bg-input: #272C36;
+    --bg-hover: rgba(136,192,208,0.10);
+    --bg-active: rgba(136,192,208,0.15);
+    --bg-selected: rgba(136,192,208,0.15);
+    --accent-primary: #88C0D0;
+    --accent-primary-hover: #8FBCBB;
+    --accent-primary-active: #5E81AC;
+    --accent-secondary: #EBCB8B;
+    --accent-success: #A3BE8C;
+    --accent-error: #BF616A;
+    --text-primary: #ECEFF4;
+    --text-secondary: #D8DEE9;
+    --text-disabled: #4C566A;
+    --border-subtle: rgba(216,222,233,0.06);
+    --border-default: rgba(216,222,233,0.10);
+    --border-focus: #88C0D0;
+  }
+
+  .theme-dracula {
+    --bg-desktop: #282A36;
+    --bg-panel: #343746;
+    --bg-window: #282A36;
+    --bg-titlebar: #21222C;
+    --bg-context-menu: #343746;
+    --bg-input: #21222C;
+    --bg-hover: rgba(189,147,249,0.10);
+    --bg-active: rgba(189,147,249,0.15);
+    --bg-selected: rgba(189,147,249,0.15);
+    --accent-primary: #BD93F9;
+    --accent-primary-hover: #CAA9FA;
+    --accent-primary-active: #9B6DFF;
+    --accent-secondary: #FFB86C;
+    --accent-success: #50FA7B;
+    --accent-error: #FF5555;
+    --text-primary: #F8F8F2;
+    --text-secondary: #C0C0C0;
+    --text-disabled: #6272A4;
+    --border-subtle: rgba(248,248,242,0.06);
+    --border-default: rgba(248,248,242,0.10);
+    --border-focus: #BD93F9;
+  }
+
+  .theme-solarized {
+    --bg-desktop: #002B36;
+    --bg-panel: #073642;
+    --bg-window: #002B36;
+    --bg-titlebar: #001E27;
+    --bg-context-menu: #073642;
+    --bg-input: #001E27;
+    --bg-hover: rgba(38,139,210,0.10);
+    --bg-active: rgba(38,139,210,0.15);
+    --bg-selected: rgba(38,139,210,0.15);
+    --accent-primary: #268BD2;
+    --accent-primary-hover: #2AA1ED;
+    --accent-primary-active: #1A6BA0;
+    --accent-secondary: #CB4B16;
+    --accent-success: #859900;
+    --accent-error: #DC322F;
+    --text-primary: #FDF6E3;
+    --text-secondary: #93A1A1;
+    --text-disabled: #586E75;
+    --border-subtle: rgba(253,246,227,0.06);
+    --border-default: rgba(253,246,227,0.10);
+    --border-focus: #268BD2;
+  }
+
+  .theme-gruvbox {
+    --bg-desktop: #282828;
+    --bg-panel: #3C3836;
+    --bg-window: #282828;
+    --bg-titlebar: #1D2021;
+    --bg-context-menu: #3C3836;
+    --bg-input: #1D2021;
+    --bg-hover: rgba(254,128,25,0.10);
+    --bg-active: rgba(254,128,25,0.15);
+    --bg-selected: rgba(254,128,25,0.15);
+    --accent-primary: #FE8019;
+    --accent-primary-hover: #FABD2F;
+    --accent-primary-active: #D65D0E;
+    --accent-secondary: #B8BB26;
+    --accent-success: #B8BB26;
+    --accent-error: #FB4934;
+    --text-primary: #EBDBB2;
+    --text-secondary: #A89984;
+    --text-disabled: #665C54;
+    --border-subtle: rgba(235,219,178,0.06);
+    --border-default: rgba(235,219,178,0.10);
+    --border-focus: #FE8019;
+  }
+
+  .theme-tokyo-night {
+    --bg-desktop: #1A1B26;
+    --bg-panel: #24283B;
+    --bg-window: #1A1B26;
+    --bg-titlebar: #16161E;
+    --bg-context-menu: #24283B;
+    --bg-input: #16161E;
+    --bg-hover: rgba(122,162,247,0.10);
+    --bg-active: rgba(122,162,247,0.15);
+    --bg-selected: rgba(122,162,247,0.15);
+    --accent-primary: #7AA2F7;
+    --accent-primary-hover: #89B4FA;
+    --accent-primary-active: #5A7FD4;
+    --accent-secondary: #FF9E64;
+    --accent-success: #9ECE6A;
+    --accent-error: #F7768E;
+    --text-primary: #C0CAF5;
+    --text-secondary: #A9B1D6;
+    --text-disabled: #565F89;
+    --border-subtle: rgba(192,202,245,0.06);
+    --border-default: rgba(192,202,245,0.10);
+    --border-focus: #7AA2F7;
+  }
+
+  html, body, #root {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.15);
+    border-radius: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.25);
+  }
+  .light .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.15);
+  }
+  .light .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(0,0,0,0.25);
+  }
+}
+
+@layer utilities {
+  /* Line clamp utility */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Animations */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "LinuxOS Web Desktop",
+  "short_name": "LinuxOS",
+  "description": "Web-based Ubuntu Linux desktop environment with 55+ interactive applications",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#1E1E1E",
+  "theme_color": "#7C4DFF",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities", "entertainment"]
+}
