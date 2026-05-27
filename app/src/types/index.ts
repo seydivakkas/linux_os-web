@@ -36,7 +36,8 @@ export type AppCategory =
   | 'Media'
   | 'Games'
   | 'DevTools'
-  | 'Creative';
+  | 'Creative'
+  | 'Business';
 
 export interface AppDefinition {
   id: string;
@@ -208,7 +209,7 @@ export interface OSState {
 
 export type OSAction =
   | { type: 'SET_BOOT_PHASE'; phase: BootPhase }
-  | { type: 'LOGIN'; isGuest: boolean }
+  | { type: 'LOGIN'; isGuest: boolean; userName?: string }
   | { type: 'LOGOUT' }
   | { type: 'OPEN_WINDOW'; appId: string; title?: string }
   | { type: 'CLOSE_WINDOW'; windowId: string }
@@ -241,7 +242,10 @@ export type OSAction =
   | { type: 'CYCLE_ALT_TAB' }
   | { type: 'END_ALT_TAB' }
   | { type: 'CASCADE_WINDOWS' }
-  | { type: 'MINIMIZE_ALL' };
+  | { type: 'MINIMIZE_ALL' }
+  | { type: 'TILE_HORIZONTAL' }
+  | { type: 'TILE_VERTICAL' }
+  | { type: 'TILE_GRID' };
 
 // --------------------------------------------------------
 // File Associations

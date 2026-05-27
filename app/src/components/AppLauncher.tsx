@@ -73,6 +73,9 @@ const AppLauncher = memo(function AppLauncher() {
 
   return (
     <div
+      role="dialog"
+      aria-label="Application Launcher"
+      aria-modal="true"
       className="fixed inset-0 z-[3000] flex flex-col items-center"
       style={{
         background: 'var(--bg-app-grid)',
@@ -92,10 +95,12 @@ const AppLauncher = memo(function AppLauncher() {
           animation: 'searchSlideDown 400ms cubic-bezier(0, 0, 0.2, 1) 100ms both',
         }}
       >
-        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
+        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" aria-hidden="true" />
         <input
           ref={inputRef}
           type="text"
+          role="searchbox"
+          aria-label="Search applications"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Type to search applications..."
@@ -117,6 +122,7 @@ const AppLauncher = memo(function AppLauncher() {
         {searchQuery && (
           <button
             onClick={() => { setSearchQuery(''); inputRef.current?.focus(); }}
+            aria-label="Clear search"
             className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           >
             <X size={14} />
@@ -151,12 +157,16 @@ const AppLauncher = memo(function AppLauncher() {
       {/* Category tabs */}
       {!searchQuery && (
         <div
+          role="tablist"
+          aria-label="Application categories"
           className="flex items-center gap-0 mt-6 overflow-x-auto max-w-[90vw]"
           style={{ animation: 'searchSlideDown 300ms ease 250ms both' }}
         >
           {CATEGORIES.map((cat) => (
             <button
               key={cat}
+              role="tab"
+              aria-selected={activeCategory === cat}
               onClick={() => setActiveCategory(cat)}
               className="px-4 py-1.5 text-xs font-medium whitespace-nowrap transition-colors relative"
               style={{
@@ -172,6 +182,8 @@ const AppLauncher = memo(function AppLauncher() {
 
       {/* App grid */}
       <div
+        role="grid"
+        aria-label="Applications"
         className="mt-6 w-[720px] max-w-[90vw] overflow-y-auto"
         style={{
           maxHeight: 'calc(100vh - 220px)',

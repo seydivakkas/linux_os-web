@@ -1,9 +1,12 @@
 // ============================================================
 // App Router — Maps appId to component (Lazy Loaded)
+// Each app loads as a separate chunk for optimal performance.
+// ErrorBoundary catches crashes per-window (not globally).
 // ============================================================
 
 import { lazy, Suspense } from 'react';
 import type { FC } from 'react';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 // Lazy-loaded app imports — each app is a separate chunk
 const FileManager = lazy(() => import('./FileManager'));
@@ -63,17 +66,53 @@ const FlappyBird = lazy(() => import('./FlappyBird'));
 const MatrixRain = lazy(() => import('./MatrixRain'));
 const AIChat = lazy(() => import('./AIChat'));
 
-// Loading spinner shown while an app chunk loads
+// Business apps
+const KanbanBoard = lazy(() => import('./KanbanBoard'));
+const DashboardBuilder = lazy(() => import('./DashboardBuilder'));
+const InvoiceGenerator = lazy(() => import('./InvoiceGenerator'));
+const TimeTracker = lazy(() => import('./TimeTracker'));
+const Wiki = lazy(() => import('./Wiki'));
+
+// Loading skeleton shown while an app chunk loads
 const AppLoading = () => (
-  <div className="flex flex-col items-center justify-center h-full gap-3">
-    <div
-      className="w-8 h-8 rounded-full border-2 border-transparent"
-      style={{
-        borderTopColor: 'var(--accent-primary)',
-        animation: 'spin 600ms linear infinite',
-      }}
-    />
-    <span className="text-xs text-[var(--text-secondary)]">Loading…</span>
+  <div className="flex flex-col items-center justify-center h-full gap-4">
+    {/* Animated shimmer skeleton */}
+    <div className="w-full max-w-[320px] space-y-3 p-6">
+      <div
+        className="h-4 rounded-md"
+        style={{
+          background: 'linear-gradient(90deg, var(--bg-hover) 25%, var(--bg-active) 50%, var(--bg-hover) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s ease-in-out infinite',
+        }}
+      />
+      <div
+        className="h-3 w-3/4 rounded-md"
+        style={{
+          background: 'linear-gradient(90deg, var(--bg-hover) 25%, var(--bg-active) 50%, var(--bg-hover) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s ease-in-out infinite 0.1s',
+        }}
+      />
+      <div
+        className="h-3 w-1/2 rounded-md"
+        style={{
+          background: 'linear-gradient(90deg, var(--bg-hover) 25%, var(--bg-active) 50%, var(--bg-hover) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s ease-in-out infinite 0.2s',
+        }}
+      />
+    </div>
+    <div className="flex items-center gap-2">
+      <div
+        className="w-5 h-5 rounded-full border-2 border-transparent"
+        style={{
+          borderTopColor: 'var(--accent-primary)',
+          animation: 'spin 600ms linear infinite',
+        }}
+      />
+      <span className="text-xs text-[var(--text-secondary)]">Loading…</span>
+    </div>
     <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
   </div>
 );
@@ -136,6 +175,11 @@ const APP_MAP: Record<string, FC> = {
   flappybird: FlappyBird,
   matrixrain: MatrixRain,
   aichat: AIChat,
+  kanban: KanbanBoard,
+  dashboard: DashboardBuilder,
+  invoice: InvoiceGenerator,
+  timetracker: TimeTracker,
+  wiki: Wiki,
 };
 
 interface AppRouterProps {
@@ -145,14 +189,17 @@ interface AppRouterProps {
 
 const NotImplementedLazy = lazy(() => import('@/components/NotImplemented'));
 
-const AppRouter: FC<AppRouterProps> = ({ appId }) => {
+const AppRouter: FC<AppRouterProps> = ({ appId, windowId }) => {
   const AppComponent = APP_MAP[appId];
 
   return (
-    <Suspense fallback={<AppLoading />}>
-      {AppComponent ? <AppComponent /> : <NotImplementedLazy appId={appId} />}
-    </Suspense>
+    <ErrorBoundary appId={appId} key={windowId}>
+      <Suspense fallback={<AppLoading />}>
+        {AppComponent ? <AppComponent /> : <NotImplementedLazy appId={appId} />}
+      </Suspense>
+    </ErrorBoundary>
   );
 };
 
 export default AppRouter;
+

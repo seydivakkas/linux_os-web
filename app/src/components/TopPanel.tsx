@@ -4,8 +4,47 @@
 
 import { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { format } from 'date-fns';
-import { Wifi, Volume2, Battery, Power, Keyboard, Accessibility } from 'lucide-react';
+import { Wifi, Volume2, Battery, Power, Keyboard, Accessibility, Activity, Cloud, CloudOff } from 'lucide-react';
 import { useOS } from '@/hooks/useOSStore';
+import { isSupabaseConfigured, signOut as cloudSignOut } from '@/lib/supabase';
+
+// Mini FPS monitor for system tray
+const PerfMonitor = memo(function PerfMonitor() {
+  const [fps, setFps] = useState(0);
+  const [show, setShow] = useState(false);
+  const frameRef = useRef<{ last: number; frames: number; id: number }>({ last: performance.now(), frames: 0, id: 0 });
+
+  useEffect(() => {
+    if (!show) return;
+    const tick = (now: number) => {
+      frameRef.current.frames++;
+      if (now - frameRef.current.last >= 1000) {
+        setFps(frameRef.current.frames);
+        frameRef.current.frames = 0;
+        frameRef.current.last = now;
+      }
+      frameRef.current.id = requestAnimationFrame(tick);
+    };
+    frameRef.current.id = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameRef.current.id);
+  }, [show]);
+
+  return (
+    <button
+      onClick={() => setShow(p => !p)}
+      className="h-7 px-1.5 rounded hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-1"
+      aria-label="Performance monitor"
+      title={show ? `FPS: ${fps}` : 'Click to show FPS'}
+    >
+      <Activity size={12} />
+      {show && (
+        <span className="text-[9px] font-mono tabular-nums" style={{ color: fps > 50 ? 'var(--accent-success)' : fps > 30 ? 'var(--accent-warning)' : 'var(--accent-error)' }}>
+          {fps}
+        </span>
+      )}
+    </button>
+  );
+});
 
 const TopPanel = memo(function TopPanel() {
   const { state, dispatch } = useOS();
@@ -42,6 +81,8 @@ const TopPanel = memo(function TopPanel() {
 
   return (
     <div
+      role="banner"
+      aria-label="System panel"
       className="fixed top-0 left-0 right-0 z-[200] flex items-center justify-between px-2 text-xs font-medium select-none"
       style={{
         height: 28,
@@ -56,6 +97,7 @@ const TopPanel = memo(function TopPanel() {
       <div className="flex items-center">
         <button
           onClick={handleActivities}
+          aria-label="Activities — open app launcher"
           className="h-7 px-3 rounded hover:bg-[var(--bg-hover)] transition-colors text-xs font-medium"
         >
           Activities
@@ -65,6 +107,8 @@ const TopPanel = memo(function TopPanel() {
       {/* Center: Clock */}
       <button
         onClick={handleClockClick}
+        aria-label={`Clock: ${formattedDate}`}
+        aria-live="polite"
         className="absolute left-1/2 -translate-x-1/2 h-7 px-3 rounded hover:bg-[var(--bg-hover)] transition-colors text-xs font-medium group relative whitespace-nowrap"
       >
         <span style={{ letterSpacing: '0.02em' }}>{formattedTime}</span>
@@ -76,19 +120,33 @@ const TopPanel = memo(function TopPanel() {
 
       {/* Right: System tray */}
       <div className="flex items-center gap-1">
-        <button className="h-7 px-1.5 rounded hover:bg-[var(--bg-hover)] transition-colors">
+        {/* Cloud status */}
+        <button
+          className="h-7 px-1.5 rounded hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-1"
+          aria-label={isSupabaseConfigured() ? 'Cloud connected' : 'Offline mode'}
+          title={isSupabaseConfigured() ? 'Cloud Workspace — Connected' : 'Offline Mode — Configure in Settings → Cloud'}
+        >
+          {isSupabaseConfigured() ? (
+            <Cloud size={12} style={{ color: 'var(--accent-success)' }} />
+          ) : (
+            <CloudOff size={12} style={{ color: 'var(--text-disabled)' }} />
+          )}
+        </button>
+        <button className="h-7 px-1.5 rounded hover:bg-[var(--bg-hover)] transition-colors" aria-label="Accessibility">
           <Accessibility size={14} />
         </button>
-        <button className="h-7 px-1.5 rounded hover:bg-[var(--bg-hover)] transition-colors">
+        <button className="h-7 px-1.5 rounded hover:bg-[var(--bg-hover)] transition-colors" aria-label="Keyboard layout">
           <Keyboard size={14} />
         </button>
-        <button className="h-7 px-1.5 rounded hover:bg-[var(--bg-hover)] transition-colors">
+        <button className="h-7 px-1.5 rounded hover:bg-[var(--bg-hover)] transition-colors" aria-label="Wi-Fi connected">
           <Wifi size={14} />
         </button>
-        <button className="h-7 px-1.5 rounded hover:bg-[var(--bg-hover)] transition-colors">
+        <button className="h-7 px-1.5 rounded hover:bg-[var(--bg-hover)] transition-colors" aria-label="Volume">
           <Volume2 size={14} />
         </button>
-        <button className="h-7 px-1.5 rounded hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-1">
+        {/* Performance Monitor */}
+        <PerfMonitor />
+        <button className="h-7 px-1.5 rounded hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-1" aria-label="Battery: 100%">
           <Battery size={14} />
           <span className="text-[10px]">100%</span>
         </button>

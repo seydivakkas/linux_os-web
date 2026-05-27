@@ -77,10 +77,11 @@ function highlightLine(line: string, lang: string): ReactElement {
 }
 
 export default function DocumentViewer({ fileNodeId }: DocumentViewerProps) {
-  const { fs, readFile, getNodeById, getChildren } = useFileSystem();
+  const { fs, readFile, getNodeById, getChildren, writeFile } = useFileSystem();
   const [currentFileId, setCurrentFileId] = useState<string | undefined>(fileNodeId);
   const [showLineNumbers, setShowLineNumbers] = useState(true);
   const [wordWrap, setWordWrap] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [searchIndex, setSearchIndex] = useState(0);
@@ -163,6 +164,11 @@ export default function DocumentViewer({ fileNodeId }: DocumentViewerProps) {
         <button onClick={() => { setShowSearch(s => !s); if (showSearch) setSearchQuery(''); }} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm transition-colors" style={{ color: showSearch ? 'var(--accent-primary)' : 'var(--text-secondary)' }} onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
           <Search size={14} /> Find
         </button>
+        {node && (
+          <button onClick={() => setIsEditing(s => !s)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm transition-colors" style={{ color: isEditing ? 'var(--accent-primary)' : 'var(--text-secondary)' }} onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            {isEditing ? <Eye size={14} /> : <Type size={14} />} {isEditing ? 'View' : 'Edit'}
+          </button>
+        )}
         <div className="flex-1" />
         {node && (
           <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -201,30 +207,48 @@ export default function DocumentViewer({ fileNodeId }: DocumentViewerProps) {
       {/* Content */}
       <div className="flex-1 overflow-auto custom-scrollbar" ref={contentRef}>
         {node ? (
-          <div className="flex" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '13px' }}>
-            {showLineNumbers && (
-              <div className="select-none text-right pr-3 pl-2 py-2" style={{ color: 'var(--text-disabled)', background: 'var(--bg-panel)', minWidth: '48px' }}>
-                {lines.map((_, i) => (
-                  <div key={i} className="leading-5">{i + 1}</div>
-                ))}
+          isEditing ? (
+            <textarea
+              value={content}
+              onChange={e => {
+                if (currentFileId) writeFile(currentFileId, e.target.value);
+              }}
+              className={`w-full h-full p-4 bg-transparent outline-none resize-none font-mono ${wordWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre overflow-auto'}`}
+              style={{
+                color: 'var(--text-primary)',
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: '13px',
+                lineHeight: '1.5'
+              }}
+              placeholder="Start typing..."
+              autoFocus
+            />
+          ) : (
+            <div className="flex" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '13px' }}>
+              {showLineNumbers && (
+                <div className="select-none text-right pr-3 pl-2 py-2" style={{ color: 'var(--text-disabled)', background: 'var(--bg-panel)', minWidth: '48px' }}>
+                  {lines.map((_, i) => (
+                    <div key={i} className="leading-5">{i + 1}</div>
+                  ))}
+                </div>
+              )}
+              <div className={`flex-1 py-2 px-3 ${wordWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'}`}>
+                {lines.map((line, i) => {
+                  const isMatch = searchQuery && line.toLowerCase().includes(searchQuery.toLowerCase());
+                  return (
+                    <div
+                      key={i}
+                      id={`line-${i}`}
+                      className="leading-5"
+                      style={isMatch ? { background: 'rgba(124,77,255,0.2)' } : undefined}
+                    >
+                      {lang !== 'text' ? highlightLine(line, lang) : line || ' '}
+                    </div>
+                  );
+                })}
               </div>
-            )}
-            <div className={`flex-1 py-2 px-3 ${wordWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'}`}>
-              {lines.map((line, i) => {
-                const isMatch = searchQuery && line.toLowerCase().includes(searchQuery.toLowerCase());
-                return (
-                  <div
-                    key={i}
-                    id={`line-${i}`}
-                    className="leading-5"
-                    style={isMatch ? { background: 'rgba(124,77,255,0.2)' } : undefined}
-                  >
-                    {lang !== 'text' ? highlightLine(line, lang) : line || ' '}
-                  </div>
-                );
-              })}
             </div>
-          </div>
+          )
         ) : (
           <div className="flex flex-col items-center justify-center h-full gap-3" style={{ color: 'var(--text-secondary)' }}>
             <FileText size={48} strokeWidth={1} />

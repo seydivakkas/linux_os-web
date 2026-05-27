@@ -102,6 +102,107 @@ const Homepage = memo(function Homepage({ onNavigate }: { onNavigate: (url: stri
   );
 });
 
+// ---- Blocked Domains & Mock Search Engine ----
+const IS_KNOWN_BLOCKED = (url: string): boolean => {
+  if (url === 'home') return false;
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    const blockedKeywords = [
+      'google.com', 'duckduckgo.com', 'github.com', 'youtube.com',
+      'facebook.com', 'twitter.com', 'reddit.com', 'stackoverflow.com',
+      'linkedin.com', 'instagram.com', 'netflix.com'
+    ];
+    return blockedKeywords.some(kw => hostname.includes(kw));
+  } catch {
+    return false;
+  }
+};
+
+const MockSearchResults = memo(function MockSearchResults({ query, onNavigate }: { query: string; onNavigate: (url: string) => void }) {
+  const results = [
+    {
+      title: `${query} - Latest News and Updates`,
+      url: `https://news.ycombinator.com/show?q=${encodeURIComponent(query)}`,
+      snippet: `Find the most comprehensive articles, features, and analysis about ${query}. Read expert opinions and community discussions on Hacker News.`,
+    },
+    {
+      title: `What is ${query}? - Complete Guide & Definition`,
+      url: `https://en.m.wikipedia.org/wiki/${encodeURIComponent(query)}`,
+      snippet: `${query} is a modern concept widely discussed in technology circles. In this encyclopedic entry, we explore its history, architecture, practical applications, and future trends.`,
+    },
+    {
+      title: `GitHub - awesome-${query.toLowerCase().replace(/\s+/g, '-')}: A curated list of resources`,
+      url: `https://github.com/topics/${encodeURIComponent(query)}`,
+      snippet: `A curated list of awesome frameworks, libraries, software, and resources about ${query}. Join the open source community in contributing!`,
+    },
+    {
+      title: `${query} Developer Documentation & Reference`,
+      url: `https://developer.mozilla.org/en-US/search?q=${encodeURIComponent(query)}`,
+      snippet: `Learn how to integrate and build with ${query}. Read MDN web docs, API specifications, tutorials, and practical examples for frontend developers.`,
+    }
+  ];
+
+  return (
+    <div className="h-full flex flex-col custom-scrollbar overflow-auto p-6" style={{ background: 'var(--bg-window)' }}>
+      <div className="flex items-center gap-4 pb-4 border-b mb-6" style={{ borderColor: 'var(--border-subtle)' }}>
+        <Globe size={24} style={{ color: 'var(--accent-primary)' }} />
+        <div className="flex-1 max-w-xl flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'var(--bg-input)', border: '1px solid var(--border-default)' }}>
+          <input
+            type="text"
+            value={query}
+            readOnly
+            className="flex-1 bg-transparent text-sm outline-none"
+            style={{ color: 'var(--text-primary)' }}
+          />
+          <Search size={14} style={{ color: 'var(--text-disabled)' }} />
+        </div>
+      </div>
+
+      <div className="flex-1 max-w-2xl space-y-6">
+        <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>
+          Showing interactive search results for <strong style={{ color: 'var(--text-primary)' }}>"{query}"</strong>
+        </p>
+        
+        {results.map((r, i) => (
+          <div key={i} className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{r.url}</span>
+            </div>
+            <button
+              onClick={() => onNavigate(r.url)}
+              className="text-left text-sm font-semibold hover:underline block"
+              style={{ color: 'var(--accent-primary)' }}
+            >
+              {r.title}
+            </button>
+            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              {r.snippet}
+            </p>
+          </div>
+        ))}
+
+        <div className="pt-6 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+          <div className="p-4 rounded-xl flex items-center justify-between" style={{ background: 'var(--bg-hover)' }}>
+            <div>
+              <h4 className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Want to open the real DuckDuckGo in a new window?</h4>
+              <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>Due to browser security policies, some search engines must be viewed in their own tab.</p>
+            </div>
+            <a
+              href={`https://duckduckgo.com/?q=${encodeURIComponent(query)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white transition-opacity hover:opacity-90"
+              style={{ background: 'var(--accent-primary)' }}
+            >
+              <ExternalLink size={12} /> Open Real DDG
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 // ---- Main Browser ----
 export default function Browser() {
   const [tabs, setTabs] = useState<Tab[]>([
@@ -225,6 +326,32 @@ export default function Browser() {
 
     if (activeTab.url === 'home') return <Homepage onNavigate={navigateTo} />;
 
+    // Render interactive mock search results if DuckDuckGo query is loaded
+    if (activeTab.url.includes('duckduckgo.com') && activeTab.url.includes('?q=')) {
+      try {
+        const query = new URL(activeTab.url).searchParams.get('q') || '';
+        return <MockSearchResults query={query} onNavigate={navigateTo} />;
+      } catch { /* fallback to standard rendering */ }
+    }
+
+    // Render beautiful embed warning sandbox if domain is known to reject iframes
+    if (IS_KNOWN_BLOCKED(activeTab.url)) {
+      return (
+        <div className="h-full flex flex-col items-center justify-center p-6 text-center" style={{ background: 'var(--bg-window)' }}>
+          <Globe size={48} className="mb-4 animate-pulse" style={{ color: 'var(--accent-primary)' }} />
+          <h2 className="text-base font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Security Sandbox Mode</h2>
+          <p className="text-xs max-w-sm mb-6 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            To protect your credentials, <strong className="text-[var(--text-primary)]">{getHostname(activeTab.url)}</strong> blocks embedding. You can safely browse this site in a secure new browser tab.
+          </p>
+          <a href={activeTab.url} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-medium text-white transition-opacity hover:opacity-90"
+            style={{ background: 'var(--accent-primary)' }}>
+            <ExternalLink size={14} /> Open in new tab
+          </a>
+        </div>
+      );
+    }
+
     return (
       <div className="relative w-full h-full">
         <iframe
@@ -237,7 +364,7 @@ export default function Browser() {
           onError={() => setIframeError(true)}
         />
         {iframeError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ background: 'var(--bg-window)' }}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center" style={{ background: 'var(--bg-window)' }}>
             <Globe size={48} className="mb-4" style={{ color: 'var(--text-disabled)' }} />
             <h2 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Cannot load this page</h2>
             <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>This site blocks iframe embedding.</p>
@@ -316,6 +443,18 @@ export default function Browser() {
           <Star size={16} style={{ color: isBookmarked ? 'var(--accent-secondary)' : 'var(--text-secondary)' }}
             fill={isBookmarked ? 'var(--accent-secondary)' : 'none'} />
         </button>
+        {activeTab.url !== 'home' && (
+          <a
+            href={activeTab.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center rounded-lg hover:bg-[var(--bg-hover)]"
+            style={{ width: 32, height: 32 }}
+            title="Open page in a new browser tab"
+          >
+            <ExternalLink size={16} style={{ color: 'var(--text-primary)' }} />
+          </a>
+        )}
       </div>
 
       {/* Bookmark bar */}

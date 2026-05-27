@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Folder, FileText, Plus, Search, Trash2, Bold, Italic,
   Underline, List, ListOrdered, Edit2, Check, X,
-  Star, Clock,
+  Star, Clock, Download, Heading1, Heading2, Heading3, Code, Minus,
 } from 'lucide-react';
 
 interface Note {
@@ -173,6 +173,45 @@ const Notes: React.FC = () => {
     const tmp = document.createElement('div');
     tmp.innerHTML = html;
     return tmp.textContent || tmp.innerText || '';
+  };
+
+  const htmlToMarkdown = (html: string): string => {
+    return html
+      .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n')
+      .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n')
+      .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n')
+      .replace(/<b>(.*?)<\/b>/gi, '**$1**')
+      .replace(/<strong>(.*?)<\/strong>/gi, '**$1**')
+      .replace(/<i>(.*?)<\/i>/gi, '*$1*')
+      .replace(/<em>(.*?)<\/em>/gi, '*$1*')
+      .replace(/<u>(.*?)<\/u>/gi, '$1')
+      .replace(/<li>(.*?)<\/li>/gi, '- $1\n')
+      .replace(/<code>(.*?)<\/code>/gi, '`$1`')
+      .replace(/<pre>(.*?)<\/pre>/gis, '```\n$1\n```\n')
+      .replace(/<hr\s*\/?>/gi, '---\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<p>(.*?)<\/p>/gi, '$1\n\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .replace(/\n{3,}/g, '\n\n').trim();
+  };
+
+  const exportMarkdown = () => {
+    if (!activeNote) return;
+    const md = `# ${activeNote.title}\n\n${htmlToMarkdown(activeNote.content)}`;
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `${activeNote.title || 'note'}.md`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportHTML = () => {
+    if (!activeNote) return;
+    const html = `<!DOCTYPE html><html><head><title>${activeNote.title}</title><style>body{font-family:sans-serif;max-width:720px;margin:40px auto;padding:0 20px;line-height:1.6;color:#333;}h1{border-bottom:2px solid #eee;padding-bottom:8px;}</style></head><body><h1>${activeNote.title}</h1>${activeNote.content}</body></html>`;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `${activeNote.title || 'note'}.html`; a.click();
+    URL.revokeObjectURL(url);
   };
 
   const userFolders = folders.filter(f => !f.isSystem);
@@ -345,6 +384,30 @@ const Notes: React.FC = () => {
               </button>
               <button onClick={() => execCmd('insertOrderedList')} className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]" title="Numbered List">
                 <ListOrdered size={13} />
+              </button>
+              <div className="w-px h-4 mx-1" style={{ background: 'var(--border-subtle)' }} />
+              <button onClick={() => execCmd('formatBlock', 'h1')} className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]" title="Heading 1">
+                <Heading1 size={13} />
+              </button>
+              <button onClick={() => execCmd('formatBlock', 'h2')} className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]" title="Heading 2">
+                <Heading2 size={13} />
+              </button>
+              <button onClick={() => execCmd('formatBlock', 'h3')} className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]" title="Heading 3">
+                <Heading3 size={13} />
+              </button>
+              <div className="w-px h-4 mx-1" style={{ background: 'var(--border-subtle)' }} />
+              <button onClick={() => { const sel = window.getSelection(); if (sel && sel.rangeCount) { const range = sel.getRangeAt(0); const code = document.createElement('code'); code.style.background = 'var(--bg-hover)'; code.style.padding = '1px 4px'; code.style.borderRadius = '3px'; code.style.fontFamily = 'monospace'; range.surroundContents(code); } }} className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]" title="Inline Code">
+                <Code size={13} />
+              </button>
+              <button onClick={() => execCmd('insertHorizontalRule')} className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]" title="Horizontal Rule">
+                <Minus size={13} />
+              </button>
+              <div className="w-px h-4 mx-1" style={{ background: 'var(--border-subtle)' }} />
+              <button onClick={exportMarkdown} className="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[10px]" title="Export Markdown">
+                <Download size={11} /> .md
+              </button>
+              <button onClick={exportHTML} className="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[10px]" title="Export HTML">
+                <Download size={11} /> .html
               </button>
               <div className="flex-1" />
               <button

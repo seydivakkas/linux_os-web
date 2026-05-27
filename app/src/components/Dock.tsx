@@ -111,6 +111,8 @@ const Dock = memo(function Dock() {
 
         {/* Icon */}
         <button
+          aria-label={isTrash ? 'Trash' : `${app?.name || appId}${isOpen ? ' (open)' : ''}`}
+          aria-pressed={isOpen}
           onClick={() => isTrash ? handleTrashClick() : handleAppClick(appId)}
           onContextMenu={(e) => {
             e.preventDefault();
@@ -169,6 +171,8 @@ const Dock = memo(function Dock() {
 
   return (
     <div
+      role="toolbar"
+      aria-label="Application dock"
       className="fixed bottom-0 left-1/2 -translate-x-1/2 z-[150] flex items-center gap-0.5 px-2"
       style={{
         height: 48,
@@ -184,6 +188,8 @@ const Dock = memo(function Dock() {
       {/* Show Applications button */}
       <button
         onClick={handleShowApps}
+        aria-label="Show Applications"
+        aria-pressed={state.appLauncherOpen}
         className="w-10 h-10 rounded-[10px] flex items-center justify-center hover:bg-[var(--bg-hover)] transition-all"
         style={{
           background: state.appLauncherOpen ? 'var(--bg-active)' : 'transparent',

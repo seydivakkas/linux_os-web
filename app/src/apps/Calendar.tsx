@@ -5,10 +5,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   ChevronLeft, ChevronRight, X, Clock, MapPin,
-  AlignLeft, Trash2, Edit2,
+  AlignLeft, Trash2, Edit2, Download, Repeat,
 } from 'lucide-react';
 
 type ViewMode = 'month' | 'week' | 'day';
+
+type RecurrenceType = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 interface CalendarEvent {
   id: string;
@@ -19,6 +21,7 @@ interface CalendarEvent {
   color: string;
   description: string;
   location: string;
+  recurrence: RecurrenceType;
 }
 
 const EVENT_COLORS = [
@@ -43,9 +46,9 @@ const loadEvents = (): CalendarEvent[] => {
   const m = String(today.getMonth() + 1).padStart(2, '0');
   const d = String(today.getDate()).padStart(2, '0');
   return [
-    { id: generateId(), title: 'Project Review', date: `${y}-${m}-${d}`, time: '10:00', duration: 60, color: '#7C4DFF', description: 'Weekly project status review', location: 'Conference Room' },
-    { id: generateId(), title: 'Lunch with Team', date: `${y}-${m}-${d}`, time: '12:30', duration: 60, color: '#4CAF50', description: '', location: 'Cafeteria' },
-    { id: generateId(), title: 'Code Review', date: `${y}-${m}-${String(Math.min(31, Number(d) + 2)).padStart(2, '0')}`, time: '14:00', duration: 90, color: '#2196F3', description: 'Review PRs', location: '' },
+    { id: generateId(), title: 'Project Review', date: `${y}-${m}-${d}`, time: '10:00', duration: 60, color: '#7C4DFF', description: 'Weekly project status review', location: 'Conference Room', recurrence: 'weekly' },
+    { id: generateId(), title: 'Lunch with Team', date: `${y}-${m}-${d}`, time: '12:30', duration: 60, color: '#4CAF50', description: '', location: 'Cafeteria', recurrence: 'none' },
+    { id: generateId(), title: 'Code Review', date: `${y}-${m}-${String(Math.min(31, Number(d) + 2)).padStart(2, '0')}`, time: '14:00', duration: 90, color: '#2196F3', description: 'Review PRs', location: '', recurrence: 'none' },
   ];
 };
 
@@ -72,6 +75,7 @@ const Calendar: React.FC = () => {
   const [formColor, setFormColor] = useState(EVENT_COLORS[0]);
   const [formDescription, setFormDescription] = useState('');
   const [formLocation, setFormLocation] = useState('');
+  const [formRecurrence, setFormRecurrence] = useState<RecurrenceType>('none');
 
   useEffect(() => {
     localStorage.setItem('ubuntuos_calendar_events', JSON.stringify(events));
@@ -114,8 +118,24 @@ const Calendar: React.FC = () => {
     return days;
   }, [year, month]);
 
-  const getEventsForDate = (dateKey: string) =>
-    events.filter(e => e.date === dateKey).sort((a, b) => a.time.localeCompare(b.time));
+  // Expand recurring events for a given date
+  const getEventsForDate = (dateKey: string) => {
+    const result: CalendarEvent[] = [];
+    const target = new Date(dateKey + 'T00:00:00');
+    events.forEach(e => {
+      if (e.date === dateKey) { result.push(e); return; }
+      if (e.recurrence === 'none') return;
+      const eventDate = new Date(e.date + 'T00:00:00');
+      if (target < eventDate) return; // only show after start
+      const diffMs = target.getTime() - eventDate.getTime();
+      const diffDays = Math.round(diffMs / 86400000);
+      if (e.recurrence === 'daily' && diffDays > 0) { result.push({ ...e, date: dateKey, id: e.id + '_' + dateKey }); return; }
+      if (e.recurrence === 'weekly' && diffDays % 7 === 0 && diffDays > 0) { result.push({ ...e, date: dateKey, id: e.id + '_' + dateKey }); return; }
+      if (e.recurrence === 'monthly' && target.getDate() === eventDate.getDate() && (target.getMonth() !== eventDate.getMonth() || target.getFullYear() !== eventDate.getFullYear())) { result.push({ ...e, date: dateKey, id: e.id + '_' + dateKey }); return; }
+      if (e.recurrence === 'yearly' && target.getDate() === eventDate.getDate() && target.getMonth() === eventDate.getMonth() && target.getFullYear() !== eventDate.getFullYear()) { result.push({ ...e, date: dateKey, id: e.id + '_' + dateKey }); return; }
+    });
+    return result.sort((a, b) => a.time.localeCompare(b.time));
+  };
 
   const openNewEvent = (dateKey: string) => {
     setEditingEvent(null);
@@ -126,6 +146,7 @@ const Calendar: React.FC = () => {
     setFormColor(EVENT_COLORS[0]);
     setFormDescription('');
     setFormLocation('');
+    setFormRecurrence('none');
     setShowEventModal(true);
   };
 
@@ -138,6 +159,7 @@ const Calendar: React.FC = () => {
     setFormColor(event.color);
     setFormDescription(event.description);
     setFormLocation(event.location);
+    setFormRecurrence(event.recurrence || 'none');
     setShowEventModal(true);
     setViewingEvent(null);
   };
@@ -148,11 +170,13 @@ const Calendar: React.FC = () => {
       setEvents(prev => prev.map(e => e.id === editingEvent.id ? {
         ...e, title: formTitle, date: selectedDate, time: formTime,
         duration: formDuration, color: formColor, description: formDescription, location: formLocation,
+        recurrence: formRecurrence,
       } : e));
     } else {
       setEvents(prev => [...prev, {
         id: generateId(), title: formTitle, date: selectedDate, time: formTime,
         duration: formDuration, color: formColor, description: formDescription, location: formLocation,
+        recurrence: formRecurrence,
       }]);
     }
     setShowEventModal(false);
@@ -176,6 +200,27 @@ const Calendar: React.FC = () => {
   };
 
   const goToday = () => setCurrentDate(new Date());
+
+  const exportICS = () => {
+    let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//LinuxOS//Calendar//EN\n';
+    events.forEach(e => {
+      const dt = e.date.replace(/-/g, '') + 'T' + e.time.replace(':', '') + '00';
+      const endH = parseInt(e.time.split(':')[0]) + Math.floor(e.duration / 60);
+      const endM = parseInt(e.time.split(':')[1]) + (e.duration % 60);
+      const dtEnd = e.date.replace(/-/g, '') + 'T' + String(endH).padStart(2, '0') + String(endM).padStart(2, '0') + '00';
+      ics += `BEGIN:VEVENT\nDTSTART:${dt}\nDTEND:${dtEnd}\nSUMMARY:${e.title}\nDESCRIPTION:${e.description || ''}\nLOCATION:${e.location || ''}\n`;
+      if (e.recurrence !== 'none') {
+        const rruleMap: Record<string, string> = { daily: 'DAILY', weekly: 'WEEKLY', monthly: 'MONTHLY', yearly: 'YEARLY' };
+        ics += `RRULE:FREQ=${rruleMap[e.recurrence]}\n`;
+      }
+      ics += 'END:VEVENT\n';
+    });
+    ics += 'END:VCALENDAR';
+    const blob = new Blob([ics], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'calendar.ics'; a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Mini month calendar for sidebar
   const miniMonthDays = useMemo(() => {
@@ -260,6 +305,9 @@ const Calendar: React.FC = () => {
               <ChevronRight size={16} />
             </button>
             <div className="w-px h-5 mx-2" style={{ background: 'var(--border-subtle)' }} />
+            <button onClick={exportICS} className="flex items-center gap-1 px-2 py-1.5 rounded text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]" title="Export .ics">
+              <Download size={12} /> .ics
+            </button>
             {(['month', 'week', 'day'] as ViewMode[]).map(v => (
               <button
                 key={v}
@@ -454,6 +502,20 @@ const Calendar: React.FC = () => {
                   className="w-20 h-8 px-2 rounded-lg text-sm text-[var(--text-primary)] outline-none"
                   style={{ background: 'var(--bg-input)', border: '1px solid var(--border-default)' }}
                 />
+                <div className="w-px h-6 mx-1" style={{ background: 'var(--border-subtle)' }} />
+                <Repeat size={12} className="text-[var(--text-secondary)]" />
+                <select
+                  value={formRecurrence}
+                  onChange={e => setFormRecurrence(e.target.value as RecurrenceType)}
+                  className="h-8 px-2 rounded-lg text-xs text-[var(--text-primary)] outline-none"
+                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border-default)' }}
+                >
+                  <option value="none">No Repeat</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
               </div>
               <div className="flex gap-2">
                 {EVENT_COLORS.map(c => (

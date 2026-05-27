@@ -6,9 +6,16 @@ import { useState, useCallback } from 'react';
 import {
   Wifi, Bluetooth, Image, Palette, Bell, Volume2, Battery,
   Monitor, Mouse, Keyboard, Printer, Disc, Clock, User,
-  Star, Eye, Info, Search, Check,
+  Star, Eye, Info, Search, Check, Globe, Languages, Cloud, Database, Shield,
 } from 'lucide-react';
 import { useOS } from '@/hooks/useOSStore';
+import { useTranslation } from '@/i18n';
+import type { Locale } from '@/i18n';
+import type { ColorTheme } from '@/types';
+import {
+  isSupabaseConfigured, getSupabaseConfig, saveSupabaseConfig,
+  getSupabase, signOut as cloudSignOut, getCurrentUser,
+} from '@/lib/supabase';
 
 interface SettingCategory {
   id: string;
@@ -33,6 +40,9 @@ const CATEGORIES: SettingCategory[] = [
   { id: 'users', label: 'Users', icon: <User size={18} /> },
   { id: 'defaultapps', label: 'Default Apps', icon: <Star size={18} /> },
   { id: 'privacy', label: 'Privacy', icon: <Eye size={18} /> },
+  { id: 'language', label: 'Language', icon: <Globe size={18} /> },
+  { id: 'accessibility', label: 'Accessibility', icon: <Languages size={18} /> },
+  { id: 'cloud', label: 'Cloud & Sync', icon: <Cloud size={18} /> },
   { id: 'about', label: 'About', icon: <Info size={18} /> },
 ];
 
@@ -84,8 +94,18 @@ const Slider: React.FC<{ value: number; min?: number; max?: number; onChange: (v
   />
 );
 
+const COLOR_THEMES: { id: ColorTheme; name: string; preview: string }[] = [
+  { id: 'default', name: 'Default', preview: '#7C4DFF' },
+  { id: 'nord', name: 'Nord', preview: '#88C0D0' },
+  { id: 'dracula', name: 'Dracula', preview: '#BD93F9' },
+  { id: 'solarized', name: 'Solarized', preview: '#268BD2' },
+  { id: 'gruvbox', name: 'Gruvbox', preview: '#FE8019' },
+  { id: 'tokyo-night', name: 'Tokyo Night', preview: '#7AA2F7' },
+];
+
 const Settings: React.FC = () => {
   const { state, dispatch } = useOS();
+  const { locale, setLocale, availableLocales } = useTranslation();
   const [activeCategory, setActiveCategory] = useState('appearance');
   const [search, setSearch] = useState('');
 
@@ -98,6 +118,7 @@ const Settings: React.FC = () => {
     setSettings(prev => {
       const next = { ...prev, [key]: value };
       localStorage.setItem('ubuntuos_settings', JSON.stringify(next));
+      window.dispatchEvent(new CustomEvent('ubuntuos:settings-updated', { detail: { key, value } }));
       return next;
     });
   }, []);
@@ -163,6 +184,30 @@ const Settings: React.FC = () => {
                     }}
                     title={c.name}
                   />
+                ))}
+              </div>
+            </div>
+
+            {/* Color Theme */}
+            <div className="space-y-3">
+              <div className="text-xs text-[var(--text-secondary)] uppercase tracking-wider">Color Theme</div>
+              <div className="grid grid-cols-3 gap-2">
+                {COLOR_THEMES.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => dispatch({ type: 'SET_THEME', theme: { colorTheme: t.id } })}
+                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs transition-all hover:scale-[1.02]"
+                    style={{
+                      background: state.theme.colorTheme === t.id ? 'var(--bg-selected)' : 'var(--bg-input)',
+                      border: state.theme.colorTheme === t.id ? `2px solid ${t.preview}` : '2px solid transparent',
+                    }}
+                  >
+                    <div className="w-4 h-4 rounded-full shrink-0" style={{ background: t.preview }} />
+                    <span style={{ color: state.theme.colorTheme === t.id ? t.preview : 'var(--text-primary)' }}>
+                      {t.name}
+                    </span>
+                    {state.theme.colorTheme === t.id && <Check size={12} style={{ color: t.preview, marginLeft: 'auto' }} />}
+                  </button>
                 ))}
               </div>
             </div>
@@ -372,6 +417,225 @@ const Settings: React.FC = () => {
           </div>
         );
 
+      case 'language':
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold text-[var(--text-primary)]">Language</h2>
+            <p className="text-xs text-[var(--text-secondary)]">Choose the display language for the desktop environment.</p>
+            <div className="space-y-2">
+              {(Object.entries(availableLocales) as [Locale, string][]).map(([code, name]) => (
+                <button
+                  key={code}
+                  onClick={() => setLocale(code)}
+                  className="flex items-center justify-between w-full px-4 py-3 rounded-lg text-sm transition-all"
+                  style={{
+                    background: locale === code ? 'var(--bg-selected)' : 'var(--bg-input)',
+                    border: locale === code ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">{code === 'en' ? '🇬🇧' : code === 'tr' ? '🇹🇷' : '🌐'}</span>
+                    <div className="text-left">
+                      <div style={{ color: 'var(--text-primary)' }}>{name}</div>
+                      <div className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{code.toUpperCase()}</div>
+                    </div>
+                  </div>
+                  {locale === code && <Check size={18} style={{ color: 'var(--accent-primary)' }} />}
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 px-4 py-3 rounded-lg text-xs" style={{ background: 'var(--bg-input)', color: 'var(--text-secondary)' }}>
+              <strong>Note:</strong> Language changes are applied immediately. Some application content may remain in English.
+            </div>
+          </div>
+        );
+
+      case 'accessibility':
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold text-[var(--text-primary)]">Accessibility</h2>
+            <div className="flex items-center justify-between py-3 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+              <div>
+                <div className="text-sm text-[var(--text-primary)]">Reduce Motion</div>
+                <div className="text-xs text-[var(--text-secondary)]">Minimizes animations throughout the interface</div>
+              </div>
+              <Toggle value={!!s('reduce_motion', false)} onChange={v => {
+                updateSetting('reduce_motion', v);
+                document.documentElement.style.setProperty('--reduce-motion', v ? 'reduce' : 'no-preference');
+              }} />
+            </div>
+            <div className="flex items-center justify-between py-3 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+              <div>
+                <div className="text-sm text-[var(--text-primary)]">High Contrast</div>
+                <div className="text-xs text-[var(--text-secondary)]">Increase contrast for better visibility</div>
+              </div>
+              <Toggle value={!!s('high_contrast', false)} onChange={v => updateSetting('high_contrast', v)} />
+            </div>
+            <div className="flex items-center justify-between py-3 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+              <div>
+                <div className="text-sm text-[var(--text-primary)]">Large Text</div>
+                <div className="text-xs text-[var(--text-secondary)]">Increase font size across the system</div>
+              </div>
+              <Toggle value={!!s('large_text', false)} onChange={v => updateSetting('large_text', v)} />
+            </div>
+            <div className="flex items-center justify-between py-3 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+              <div>
+                <div className="text-sm text-[var(--text-primary)]">Screen Reader Support</div>
+                <div className="text-xs text-[var(--text-secondary)]">Enhanced ARIA attributes for assistive technologies</div>
+              </div>
+              <Toggle value={!!s('screen_reader', false)} onChange={v => updateSetting('screen_reader', v)} />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-[var(--text-primary)]">Keyboard Shortcuts</div>
+                <div className="text-xs text-[var(--text-secondary)]">Show keyboard shortcut hints</div>
+              </div>
+              <Toggle value={!!s('kbd_hints', true)} onChange={v => updateSetting('kbd_hints', v)} />
+            </div>
+          </div>
+        );
+
+      case 'cloud': {
+        const config = getSupabaseConfig();
+        const isConfigured = isSupabaseConfigured();
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold text-[var(--text-primary)] flex items-center gap-3">
+              <Cloud size={24} /> Cloud & Sync
+            </h2>
+            <p className="text-xs text-[var(--text-secondary)]">
+              Connect to Supabase for cloud sync, real authentication, file storage, and multi-device access.
+            </p>
+
+            {/* Status */}
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{
+              background: isConfigured ? 'rgba(76,175,80,0.08)' : 'rgba(255,152,0,0.08)',
+              border: `1px solid ${isConfigured ? 'rgba(76,175,80,0.2)' : 'rgba(255,152,0,0.2)'}`,
+            }}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{
+                background: isConfigured ? 'rgba(76,175,80,0.15)' : 'rgba(255,152,0,0.15)',
+              }}>
+                {isConfigured ? <Cloud size={18} style={{ color: '#4CAF50' }} /> : <Database size={18} style={{ color: '#FF9800' }} />}
+              </div>
+              <div>
+                <div className="text-sm font-medium" style={{ color: isConfigured ? '#4CAF50' : '#FF9800' }}>
+                  {isConfigured ? 'Cloud Connected' : 'Offline Mode'}
+                </div>
+                <div className="text-[10px] text-[var(--text-secondary)]">
+                  {isConfigured ? 'Data syncs across all your devices' : 'Data stored locally in this browser only'}
+                </div>
+              </div>
+            </div>
+
+            {/* Config inputs */}
+            <div className="space-y-3">
+              <div className="text-xs text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-2">
+                <Shield size={12} /> Supabase Configuration
+              </div>
+              <div>
+                <label className="text-xs text-[var(--text-secondary)] block mb-1">Project URL</label>
+                <input
+                  defaultValue={config.url}
+                  placeholder="https://your-project.supabase.co"
+                  className="w-full h-9 px-3 rounded-lg text-sm text-[var(--text-primary)] outline-none"
+                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border-default)' }}
+                  onChange={e => {
+                    const c = getSupabaseConfig();
+                    saveSupabaseConfig({ ...c, url: e.target.value.trim() });
+                  }}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-[var(--text-secondary)] block mb-1">Anon Key</label>
+                <input
+                  defaultValue={config.anonKey}
+                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI..."
+                  className="w-full h-9 px-3 rounded-lg text-sm text-[var(--text-primary)] outline-none font-mono text-[11px]"
+                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border-default)' }}
+                  onChange={e => {
+                    const c = getSupabaseConfig();
+                    saveSupabaseConfig({ ...c, anonKey: e.target.value.trim() });
+                  }}
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  className="px-4 py-2 rounded-lg text-xs font-medium text-white"
+                  style={{ background: 'var(--accent-primary)' }}
+                  onClick={async () => {
+                    const sb = getSupabase();
+                    if (!sb) { alert('Enter URL and key first'); return; }
+                    try {
+                      const { error } = await sb.auth.getSession();
+                      if (error) throw error;
+                      alert('\u2705 Connection successful!');
+                    } catch (err) {
+                      alert('\u274c Connection failed: ' + (err as Error).message);
+                    }
+                  }}
+                >
+                  Test Connection
+                </button>
+                {isConfigured && (
+                  <button
+                    className="px-4 py-2 rounded-lg text-xs font-medium text-[var(--accent-error)]"
+                    style={{ background: 'rgba(244,67,54,0.1)' }}
+                    onClick={() => {
+                      saveSupabaseConfig({ url: '', anonKey: '' });
+                      alert('Cloud disconnected. Reload to apply.');
+                    }}
+                  >
+                    Disconnect
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Cloud Sign Out */}
+            {isConfigured && (
+              <div className="pt-3 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+                <button
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs text-[var(--accent-error)] hover:bg-[var(--bg-hover)]"
+                  onClick={async () => {
+                    await cloudSignOut();
+                    window.location.reload();
+                  }}
+                >
+                  Sign out from cloud
+                </button>
+              </div>
+            )}
+
+            {/* Setup Guide */}
+            <div className="space-y-2 pt-3 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+              <div className="text-xs text-[var(--text-secondary)] uppercase tracking-wider">Setup Guide</div>
+              <ol className="text-xs text-[var(--text-secondary)] space-y-1.5 list-decimal list-inside">
+                <li>Go to <span className="text-[var(--accent-primary)]">supabase.com</span> → Create a free project</li>
+                <li>Enable Authentication → Providers → Google & GitHub</li>
+                <li>Go to SQL Editor → Run the schema from <span className="font-mono text-[10px] text-[var(--accent-primary)]">src/lib/supabase.ts</span></li>
+                <li>Copy URL + anon key from Settings → API</li>
+                <li>Paste above → Test Connection</li>
+                <li>Create a Storage bucket named <span className="font-mono text-[10px] text-[var(--accent-primary)]">user-files</span></li>
+              </ol>
+            </div>
+
+            {/* What syncs */}
+            <div className="space-y-2">
+              <div className="text-xs text-[var(--text-secondary)] uppercase tracking-wider">What Syncs</div>
+              <div className="grid grid-cols-2 gap-2">
+                {['Notes', 'Todos', 'Calendar', 'Kanban Board', 'Time Tracker', 'Wiki', 'Invoices', 'Dashboard', 'Contacts', 'Spreadsheet', 'Settings', 'File System'].map(item => (
+                  <div key={item} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded" style={{ background: 'var(--bg-input)' }}>
+                    <Check size={10} style={{ color: isConfigured ? 'var(--accent-success)' : 'var(--text-disabled)' }} />
+                    <span style={{ color: 'var(--text-primary)' }}>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       case 'about':
         return (
           <div className="space-y-6">
@@ -411,6 +675,78 @@ const Settings: React.FC = () => {
             >
               Check for Updates
             </button>
+
+            {/* Workspace Backup & Restore */}
+            <div className="space-y-2 pt-4 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+              <div className="text-xs text-[var(--text-secondary)] uppercase tracking-wider">Workspace Data</div>
+              <div className="flex gap-2">
+                <button
+                  className="flex-1 py-2 rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border-default)' }}
+                  onClick={() => {
+                    const backup: Record<string, string> = {};
+                    for (let i = 0; i < localStorage.length; i++) {
+                      const key = localStorage.key(i);
+                      if (key && (key.startsWith('ubuntuos_') || key.startsWith('linuxos_') || key.startsWith('owm_'))) {
+                        backup[key] = localStorage.getItem(key) || '';
+                      }
+                    }
+                    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = `linuxos-backup-${new Date().toISOString().slice(0, 10)}.json`;
+                    a.click(); URL.revokeObjectURL(url);
+                  }}
+                >
+                  📦 Export Backup
+                </button>
+                <button
+                  className="flex-1 py-2 rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border-default)' }}
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file'; input.accept = '.json';
+                    input.onchange = async () => {
+                      const file = input.files?.[0];
+                      if (!file) return;
+                      try {
+                        const text = await file.text();
+                        const data = JSON.parse(text) as Record<string, string>;
+                        let count = 0;
+                        Object.entries(data).forEach(([key, value]) => {
+                          if (key.startsWith('ubuntuos_') || key.startsWith('linuxos_') || key.startsWith('owm_')) {
+                            localStorage.setItem(key, value);
+                            count++;
+                          }
+                        });
+                        alert(`✅ Restored ${count} items. Reload to apply.`);
+                      } catch { alert('❌ Invalid backup file.'); }
+                    };
+                    input.click();
+                  }}
+                >
+                  📥 Import Backup
+                </button>
+              </div>
+              <button
+                className="w-full py-2 rounded-lg text-xs font-medium transition-colors"
+                style={{ color: 'var(--accent-error)', background: 'rgba(244,67,54,0.06)' }}
+                onClick={() => {
+                  if (confirm('⚠️ This will delete ALL workspace data. Are you sure?')) {
+                    const keys: string[] = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                      const key = localStorage.key(i);
+                      if (key && (key.startsWith('ubuntuos_') || key.startsWith('linuxos_'))) keys.push(key);
+                    }
+                    keys.forEach(k => localStorage.removeItem(k));
+                    alert('🗑️ All data cleared. Reloading...');
+                    window.location.reload();
+                  }
+                }}
+              >
+                🗑️ Reset All Data
+              </button>
+            </div>
           </div>
         );
 

@@ -311,6 +311,9 @@ const WindowFrame = memo(function WindowFrame({ window: win, children }: WindowF
 
       <div
         ref={frameRef}
+        role="dialog"
+        aria-label={win.title}
+        aria-modal={false}
         className="absolute flex flex-col select-none"
         style={{
           left: win.position.x,
@@ -345,6 +348,8 @@ const WindowFrame = memo(function WindowFrame({ window: win, children }: WindowF
 
         {/* Title bar */}
         <div
+          role="toolbar"
+          aria-label={`${win.title} window controls`}
           className="relative z-10 flex items-center justify-between shrink-0"
           style={{
             height: 36,
@@ -374,6 +379,7 @@ const WindowFrame = memo(function WindowFrame({ window: win, children }: WindowF
           <div className="flex items-center shrink-0">
             <button
               onClick={handleMinimize}
+              aria-label="Minimize window"
               className="w-9 h-9 flex items-center justify-center text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)] transition-colors"
               title="Minimize"
             >
@@ -381,6 +387,7 @@ const WindowFrame = memo(function WindowFrame({ window: win, children }: WindowF
             </button>
             <button
               onClick={handleMaximize}
+              aria-label={isMaximized ? 'Restore window' : 'Maximize window'}
               className="w-9 h-9 flex items-center justify-center text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)] transition-colors"
               title={isMaximized ? 'Restore' : 'Maximize'}
             >
@@ -388,6 +395,7 @@ const WindowFrame = memo(function WindowFrame({ window: win, children }: WindowF
             </button>
             <button
               onClick={handleClose}
+              aria-label="Close window"
               className="w-9 h-9 flex items-center justify-center text-[var(--text-secondary)] transition-colors"
               style={{ borderRadius: isMaximized ? 0 : '0 12px 0 0' }}
               onMouseEnter={(e) => {

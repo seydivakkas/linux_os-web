@@ -4,8 +4,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Bold, Italic, Paintbrush, Download, Plus,
-  Trash2, FileSpreadsheet,
+  Bold, Italic, Paintbrush, Download, Plus, Upload,
+  Trash2, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown,
 } from 'lucide-react';
 
 const COLS = Array.from({ length: 20 }, (_, i) => {
@@ -106,6 +106,57 @@ const Spreadsheet: React.FC = () => {
       if (func === 'MAX') return nums.length ? String(Math.max(...nums)) : '0';
       if (func === 'MIN') return nums.length ? String(Math.min(...nums)) : '0';
       if (func === 'COUNT') return String(nums.length);
+    }
+
+    // IF(condition, trueVal, falseVal)
+    const ifMatch = formula.match(/^IF\((.+),(.+),(.+)\)$/);
+    if (ifMatch) {
+      const [, cond, tVal, fVal] = ifMatch;
+      try {
+        const condExpr = cond.replace(/([A-Z]+\d+)/g, (m) => {
+          const v = evaluateCell(m, new Set(visited)); const n = parseFloat(v); return isNaN(n) ? `"${v}"` : String(n);
+        });
+        // eslint-disable-next-line no-eval
+        const condResult = eval(condExpr);
+        const resultExpr = condResult ? tVal.trim() : fVal.trim();
+        if (resultExpr.match(/^[A-Z]+\d+$/)) return evaluateCell(resultExpr, new Set(visited));
+        const n = parseFloat(resultExpr); return isNaN(n) ? resultExpr.replace(/"/g, '') : String(n);
+      } catch { return '#VALUE!'; }
+    }
+
+    // ROUND(value, decimals)
+    const roundMatch = formula.match(/^ROUND\((.+),\s*(\d+)\)$/);
+    if (roundMatch) {
+      const inner = roundMatch[1].match(/^[A-Z]+\d+$/) ? evaluateCell(roundMatch[1], new Set(visited)) : roundMatch[1];
+      const dec = parseInt(roundMatch[2]);
+      const num = parseFloat(inner); return isNaN(num) ? '#VALUE!' : num.toFixed(dec);
+    }
+
+    // ABS(value)
+    const absMatch = formula.match(/^ABS\((.+)\)$/);
+    if (absMatch) {
+      const inner = absMatch[1].match(/^[A-Z]+\d+$/) ? evaluateCell(absMatch[1], new Set(visited)) : absMatch[1];
+      const num = parseFloat(inner); return isNaN(num) ? '#VALUE!' : String(Math.abs(num));
+    }
+
+    // VLOOKUP(lookupValue, tableRange, colIndex)
+    const vlMatch = formula.match(/^VLOOKUP\((.+),([A-Z]+\d+):([A-Z]+\d+),(\d+)\)$/);
+    if (vlMatch) {
+      const lookupRaw = vlMatch[1].trim();
+      const lookup = lookupRaw.match(/^[A-Z]+\d+$/) ? evaluateCell(lookupRaw, new Set(visited)) : lookupRaw.replace(/"/g, '');
+      const rangeStart = vlMatch[2], rangeEnd = vlMatch[3];
+      const colIdx = parseInt(vlMatch[4]) - 1;
+      const sCol = rangeStart.match(/[A-Z]+/)?.[0] || 'A';
+      const sRow = parseInt(rangeStart.match(/\d+/)?.[0] || '1');
+      const eRow = parseInt(rangeEnd.match(/\d+/)?.[0] || '1');
+      const sColIdx = COLS.indexOf(sCol);
+      for (let r = sRow; r <= eRow; r++) {
+        const firstCellVal = evaluateCell(`${COLS[sColIdx]}${r}`, new Set(visited));
+        if (firstCellVal === lookup) {
+          return evaluateCell(`${COLS[sColIdx + colIdx]}${r}`, new Set(visited));
+        }
+      }
+      return '#N/A';
     }
 
     // Cell reference or simple expression
@@ -278,6 +329,56 @@ const Spreadsheet: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const importCSV = () => {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.csv,.tsv,.txt';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      const rows = text.split('\n').filter(r => r.trim());
+      const newCells: Record<string, CellData> = {};
+      rows.forEach((row, ri) => {
+        const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"|"$/g, '').trim());
+        cols.forEach((val, ci) => {
+          if (ci < COLS.length && val) newCells[`${COLS[ci]}${ri + 1}`] = { value: val };
+        });
+      });
+      setSheets(prev => prev.map((s, i) => i === activeSheet ? { ...s, cells: newCells } : s));
+    };
+    input.click();
+  };
+
+  const sortColumn = (col: string, asc: boolean) => {
+    const dataRows: { row: number; sortVal: string }[] = [];
+    for (let r = 2; r <= ROWS; r++) {
+      const cellId = `${col}${r}`;
+      const val = getDisplayValue(cellId);
+      if (val || Object.keys(sheet.cells).some(k => k.endsWith(String(r)))) dataRows.push({ row: r, sortVal: val });
+    }
+    if (dataRows.length === 0) return;
+    dataRows.sort((a, b) => {
+      const na = parseFloat(a.sortVal), nb = parseFloat(b.sortVal);
+      if (!isNaN(na) && !isNaN(nb)) return asc ? na - nb : nb - na;
+      return asc ? a.sortVal.localeCompare(b.sortVal) : b.sortVal.localeCompare(a.sortVal);
+    });
+    const newCells: Record<string, CellData> = {};
+    // Copy header row
+    for (let c = 0; c < COLS.length; c++) {
+      const hId = `${COLS[c]}1`;
+      if (sheet.cells[hId]) newCells[hId] = sheet.cells[hId];
+    }
+    // Rearrange data rows
+    dataRows.forEach((dr, newIdx) => {
+      for (let c = 0; c < COLS.length; c++) {
+        const oldId = `${COLS[c]}${dr.row}`;
+        const newId = `${COLS[c]}${newIdx + 2}`;
+        if (sheet.cells[oldId]) newCells[newId] = sheet.cells[oldId];
+      }
+    });
+    setSheets(prev => prev.map((s, i) => i === activeSheet ? { ...s, cells: newCells } : s));
+  };
+
   const addSheet = () => {
     const newSheet: Sheet = { id: generateId(), name: `Sheet${sheets.length + 1}`, cells: {} };
     setSheets(prev => [...prev, newSheet]);
@@ -315,9 +416,17 @@ const Spreadsheet: React.FC = () => {
           <Paintbrush size={13} />
         </button>
         <div className="w-px h-4 mx-1" style={{ background: 'var(--border-subtle)' }} />
-        <button onClick={exportCSV} className="flex items-center gap-1 px-2 py-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs">
+        <button onClick={importCSV} className="flex items-center gap-1 px-2 py-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs" title="CSV İçe Aktar">
+          <Upload size={12} /> İçe Aktar
+        </button>
+        <button onClick={exportCSV} className="flex items-center gap-1 px-2 py-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-xs" title="CSV Dışa Aktar">
           <Download size={12} /> CSV
         </button>
+        <div className="w-px h-4 mx-1" style={{ background: 'var(--border-subtle)' }} />
+        {selectedCell && (() => { const col = selectedCell.match(/[A-Z]+/)?.[0]; return col ? (<>
+          <button onClick={() => sortColumn(col, true)} className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]" title="A→Z Sırala"><ArrowUp size={12} /></button>
+          <button onClick={() => sortColumn(col, false)} className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]" title="Z→A Sırala"><ArrowDown size={12} /></button>
+        </>) : null; })()}
       </div>
 
       {/* Formula bar */}

@@ -17,6 +17,7 @@ import NotificationCenter from '@/components/NotificationCenter';
 import DesktopWidgets from '@/components/DesktopWidgets';
 import SpotlightSearch from '@/components/SpotlightSearch';
 import LockScreen from '@/components/LockScreen';
+import CommandPalette from '@/components/CommandPalette';
 
 function AppShell() {
   const { state, dispatch } = useOS();
@@ -24,6 +25,59 @@ function AppShell() {
   const [bootComplete, setBootComplete] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const altTabRef = useRef<{ holding: boolean }>({ holding: false });
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Listen for lock screen events from CommandPalette
+  useEffect(() => {
+    const handleLock = () => setIsLocked(true);
+    window.addEventListener('linuxos:lock', handleLock);
+    return () => window.removeEventListener('linuxos:lock', handleLock);
+  }, []);
+
+  // Dynamically apply accent color CSS variables based on OS store accent color state
+  useEffect(() => {
+    const root = document.documentElement;
+    if (state.theme.accent) {
+      root.style.setProperty('--accent-primary', state.theme.accent);
+      root.style.setProperty('--accent-primary-hover', `${state.theme.accent}dd`);
+      root.style.setProperty('--accent-primary-active', `${state.theme.accent}bb`);
+      root.style.setProperty('--border-focus', state.theme.accent);
+    }
+  }, [state.theme.accent]);
+
+  // Load and apply accessibility settings from localStorage
+  useEffect(() => {
+    const applySettings = () => {
+      try {
+        const root = document.documentElement;
+        const settings = JSON.parse(localStorage.getItem('ubuntuos_settings') || '{}');
+
+        // Apply high contrast
+        const highContrast = !!settings.high_contrast;
+        root.classList.toggle('high-contrast-mode', highContrast);
+
+        // Apply large text
+        const largeText = !!settings.large_text;
+        root.style.fontSize = largeText ? '18px' : '14px';
+
+        // Apply reduce motion
+        const reduceMotion = !!settings.reduce_motion;
+        root.style.setProperty('--reduce-motion', reduceMotion ? 'reduce' : 'no-preference');
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    applySettings();
+
+    window.addEventListener('ubuntuos:settings-updated', applySettings);
+    window.addEventListener('storage', applySettings);
+
+    return () => {
+      window.removeEventListener('ubuntuos:settings-updated', applySettings);
+      window.removeEventListener('storage', applySettings);
+    };
+  }, []);
 
   // Boot sequence
   useEffect(() => {
@@ -95,6 +149,94 @@ function AppShell() {
         e.preventDefault();
         dispatch({ type: 'CLOSE_WINDOW', windowId: state.activeWindowId });
       }
+
+      // F11 fullscreen toggle
+      if (e.key === 'F11') {
+        e.preventDefault();
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      }
+
+      // Ctrl+/ keyboard shortcuts help
+      if (e.ctrlKey && e.key === '/') {
+        e.preventDefault();
+        setShowShortcuts(prev => !prev);
+      }
+
+      // Ctrl+Shift+Left/Right window snap
+      if (e.ctrlKey && e.shiftKey && state.activeWindowId) {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight - 28 - 48; // minus panel + dock
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          dispatch({ type: 'MOVE_WINDOW', windowId: state.activeWindowId, position: { x: 0, y: 28 } });
+          dispatch({ type: 'RESIZE_WINDOW', windowId: state.activeWindowId, size: { width: vw / 2, height: vh } });
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          dispatch({ type: 'MOVE_WINDOW', windowId: state.activeWindowId, position: { x: vw / 2, y: 28 } });
+          dispatch({ type: 'RESIZE_WINDOW', windowId: state.activeWindowId, size: { width: vw / 2, height: vh } });
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          dispatch({ type: 'MAXIMIZE_WINDOW', windowId: state.activeWindowId });
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          dispatch({ type: 'RESTORE_WINDOW', windowId: state.activeWindowId });
+        }
+      }
+
+      // Tiling layouts: Ctrl+Shift+1/2/3/4
+      if (e.ctrlKey && e.shiftKey && ['1', '2', '3', '4'].includes(e.key)) {
+        e.preventDefault();
+        const vw = window.innerWidth;
+        const vh = window.innerHeight - 28 - 48;
+        const topY = 28;
+        const visibleWindows = state.windows.filter(w => w.state !== 'minimized');
+        if (visibleWindows.length === 0) return;
+
+        if (e.key === '1') {
+          // 2-column split
+          visibleWindows.forEach((w, i) => {
+            const col = i % 2;
+            dispatch({ type: 'RESTORE_WINDOW', windowId: w.id });
+            dispatch({ type: 'MOVE_WINDOW', windowId: w.id, position: { x: col * (vw / 2), y: topY } });
+            dispatch({ type: 'RESIZE_WINDOW', windowId: w.id, size: { width: vw / 2, height: vh } });
+          });
+        } else if (e.key === '2') {
+          // 3-column
+          visibleWindows.forEach((w, i) => {
+            const col = i % 3;
+            dispatch({ type: 'RESTORE_WINDOW', windowId: w.id });
+            dispatch({ type: 'MOVE_WINDOW', windowId: w.id, position: { x: col * (vw / 3), y: topY } });
+            dispatch({ type: 'RESIZE_WINDOW', windowId: w.id, size: { width: vw / 3, height: vh } });
+          });
+        } else if (e.key === '3') {
+          // Quad grid (2x2)
+          visibleWindows.forEach((w, i) => {
+            const col = i % 2;
+            const row = Math.floor(i / 2) % 2;
+            dispatch({ type: 'RESTORE_WINDOW', windowId: w.id });
+            dispatch({ type: 'MOVE_WINDOW', windowId: w.id, position: { x: col * (vw / 2), y: topY + row * (vh / 2) } });
+            dispatch({ type: 'RESIZE_WINDOW', windowId: w.id, size: { width: vw / 2, height: vh / 2 } });
+          });
+        } else if (e.key === '4') {
+          // Master + stack (first window 60%, rest stacked 40%)
+          visibleWindows.forEach((w, i) => {
+            dispatch({ type: 'RESTORE_WINDOW', windowId: w.id });
+            if (i === 0) {
+              dispatch({ type: 'MOVE_WINDOW', windowId: w.id, position: { x: 0, y: topY } });
+              dispatch({ type: 'RESIZE_WINDOW', windowId: w.id, size: { width: vw * 0.6, height: vh } });
+            } else {
+              const stackCount = visibleWindows.length - 1;
+              const stackH = vh / stackCount;
+              dispatch({ type: 'MOVE_WINDOW', windowId: w.id, position: { x: vw * 0.6, y: topY + (i - 1) * stackH } });
+              dispatch({ type: 'RESIZE_WINDOW', windowId: w.id, size: { width: vw * 0.4, height: stackH } });
+            }
+          });
+        }
+      }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -165,9 +307,10 @@ function AppShell() {
           <NotificationSystem />
           <NotificationCenter />
           <SpotlightSearch />
+          <CommandPalette />
 
           {/* Lock screen */}
-          {isLocked && <LockScreen onUnlock={() => setIsLocked(false)} userName={auth.user || 'user'} />}
+          {isLocked && <LockScreen onUnlock={() => setIsLocked(false)} userName={auth.userName || 'user'} />}
 
           {/* Alt+Tab switcher */}
           {state.isAltTabbing && (
@@ -232,6 +375,47 @@ function AppShell() {
               to { opacity: 1; transform: scale(1); }
             }
           `}</style>
+
+          {/* Keyboard Shortcuts Help */}
+          {showShortcuts && (
+            <div className="fixed inset-0 z-[6000] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}
+              onClick={() => setShowShortcuts(false)}>
+              <div className="rounded-2xl p-6 max-w-[480px] w-full" style={{ background: 'rgba(30,30,30,0.95)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', animation: 'alttabAppear 150ms ease' }}
+                onClick={e => e.stopPropagation()}>
+                <h2 className="text-base font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">⌨️ Klavye Kısayolları</h2>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
+                  {[
+                    ['Ctrl+Alt+T', 'Terminal aç'],
+                    ['Ctrl+W', 'Pencereyi kapat'],
+                    ['Alt+Tab', 'Pencere değiştir'],
+                    ['Super+D', 'Tümünü küçült'],
+                    ['Super+L', 'Ekranı kilitle'],
+                    ['F11', 'Tam ekran'],
+                    ['Ctrl+Shift+←', 'Sola yapıştır'],
+                    ['Ctrl+Shift+→', 'Sağa yapıştır'],
+                    ['Ctrl+Shift+↑', 'Maksimize et'],
+                    ['Ctrl+Shift+↓', 'Geri küçült'],
+                    ['Ctrl+/', 'Bu menü'],
+                    ['Escape', 'Menüleri kapat'],
+                    ['Ctrl+Space', 'Spotlight Arama'],
+                    ['Ctrl+Shift+P', 'Komut Paleti'],
+                    ['Ctrl+Shift+1', '2 sütun tiling'],
+                    ['Ctrl+Shift+2', '3 sütun tiling'],
+                    ['Ctrl+Shift+3', 'Quad (2x2) tiling'],
+                    ['Ctrl+Shift+4', 'Master+Stack'],
+                  ].map(([key, desc]) => (
+                    <div key={key} className="flex items-center justify-between py-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <span className="text-[var(--text-secondary)]">{desc}</span>
+                      <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono" style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--accent-primary)' }}>{key}</kbd>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 text-center">
+                  <button onClick={() => setShowShortcuts(false)} className="px-4 py-1.5 rounded-lg text-xs font-medium text-white" style={{ background: 'var(--accent-primary)' }}>Kapat</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

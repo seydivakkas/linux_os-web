@@ -4,20 +4,58 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>LinuxOS — Web Desktop Environment</title>
-    <meta name="description" content="A fully interactive Ubuntu-like desktop environment in the browser with 55+ functional applications including Terminal, File Manager, Code Editor, Games, and more." />
+    <meta name="description" content="A fully interactive Linux desktop environment in the browser with 62+ functional applications including Terminal, File Manager, Kanban Board, Invoice Generator, Dashboard Builder, Wiki, Time Tracker, and more. Built with React & TypeScript." />
     <meta name="theme-color" content="#1E1E1E" />
     <meta name="color-scheme" content="dark light" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="LinuxOS" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="manifest" href="/manifest.json" />
     <!-- OG Tags -->
     <meta property="og:title" content="LinuxOS — Web Desktop Environment" />
-    <meta property="og:description" content="55+ functional apps in a browser-based Ubuntu desktop" />
+    <meta property="og:description" content="62+ functional apps in a browser-based Linux desktop — Kanban, Dashboard, Invoice, Wiki, Time Tracker, Spreadsheet, Terminal, and more" />
     <meta property="og:type" content="website" />
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="LinuxOS — Web Desktop Environment" />
+    <meta name="twitter:description" content="62+ functional apps in a browser-based Linux desktop" />
+    <!-- Keywords -->
+    <meta name="keywords" content="linux desktop, web os, browser desktop, react, kanban, dashboard, invoice generator, time tracker, wiki, spreadsheet, SaaS" />
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "LinuxOS Web Desktop",
+      "description": "A fully interactive Linux desktop environment in the browser with 62+ applications including business tools, development utilities, and productivity apps",
+      "applicationCategory": "DesktopApplication",
+      "operatingSystem": "Web Browser",
+      "offers": { "@type": "Offer", "price": "0" },
+      "featureList": ["Kanban Board", "Dashboard Builder", "Invoice Generator", "Time Tracker", "Wiki", "Spreadsheet", "Terminal", "File Manager", "Calendar", "Notes"]
+    }
+    </script>
   </head>
   <body>
+    <!-- Skip link for keyboard accessibility -->
+    <a href="#root" class="skip-link">Skip to desktop</a>
+    <noscript>
+      <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#1e1e1e;color:#e0e0e0;font-family:sans-serif;text-align:center;padding:20px">
+        <div>
+          <h1>LinuxOS Web Desktop</h1>
+          <p>JavaScript is required to run this application.</p>
+        </div>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>

@@ -1,19 +1,52 @@
 {
   "name": "LinuxOS Web Desktop",
   "short_name": "LinuxOS",
-  "description": "Web-based Ubuntu Linux desktop environment with 55+ interactive applications",
+  "description": "A fully interactive Linux desktop environment in the browser with 62+ functional applications — Kanban, Dashboard, Invoice Generator, Wiki, Time Tracker, Spreadsheet, Terminal, and more",
   "start_url": "./",
   "display": "standalone",
+  "orientation": "landscape",
   "background_color": "#1E1E1E",
   "theme_color": "#7C4DFF",
-  "orientation": "landscape",
+  "categories": ["productivity", "utilities", "entertainment", "business"],
   "icons": [
     {
-      "src": "./favicon.svg",
+      "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ],
-  "categories": ["productivity", "utilities", "entertainment"]
+  "shortcuts": [
+    {
+      "name": "Terminal",
+      "short_name": "Term",
+      "description": "Open Terminal emulator",
+      "url": "./?app=terminal",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Kanban Board",
+      "short_name": "Kanban",
+      "description": "Project management board",
+      "url": "./?app=kanban",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Invoice Generator",
+      "short_name": "Invoice",
+      "description": "Create professional invoices",
+      "url": "./?app=invoice",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Time Tracker",
+      "short_name": "Timer",
+      "description": "Track time and billing",
+      "url": "./?app=timetracker",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    }
+  ],
+  "screenshots": [],
+  "related_applications": [],
+  "prefer_related_applications": false
 }

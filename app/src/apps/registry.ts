@@ -514,6 +514,53 @@ export const APP_REGISTRY: AppDefinition[] = [
     defaultSize: { width: 520, height: 600 },
     minSize: { width: 380, height: 400 },
   },
+
+  // ======== BUSINESS (5) ========
+  {
+    id: 'kanban',
+    name: 'Kanban Board',
+    icon: 'LayoutDashboard',
+    category: 'Business',
+    description: 'Drag-and-drop project management with customizable columns',
+    defaultSize: { width: 960, height: 640 },
+    minSize: { width: 600, height: 400 },
+  },
+  {
+    id: 'dashboard',
+    name: 'Dashboard Builder',
+    icon: 'BarChart3',
+    category: 'Business',
+    description: 'Build custom KPI dashboards with charts and widgets',
+    defaultSize: { width: 960, height: 640 },
+    minSize: { width: 600, height: 400 },
+  },
+  {
+    id: 'invoice',
+    name: 'Invoice Generator',
+    icon: 'Receipt',
+    category: 'Business',
+    description: 'Create professional invoices with PDF export',
+    defaultSize: { width: 720, height: 640 },
+    minSize: { width: 480, height: 400 },
+  },
+  {
+    id: 'timetracker',
+    name: 'Time Tracker',
+    icon: 'Timer',
+    category: 'Business',
+    description: 'Track time per project with reports and billing',
+    defaultSize: { width: 560, height: 520 },
+    minSize: { width: 400, height: 360 },
+  },
+  {
+    id: 'wiki',
+    name: 'Wiki',
+    icon: 'BookOpen',
+    category: 'Business',
+    description: 'Markdown-based knowledge base with categories and search',
+    defaultSize: { width: 800, height: 600 },
+    minSize: { width: 480, height: 360 },
+  },
 ];
 
 export const getAppById = (id: string): AppDefinition | undefined =>
@@ -525,8 +572,9 @@ export const getAppsByCategory = (category: string): AppDefinition[] =>
 export const getDefaultDockApps = (): string[] => [
   'filemanager',
   'terminal',
-  'texteditor',
   'browser',
+  'kanban',
+  'dashboard',
   'aichat',
   'settings',
 ];

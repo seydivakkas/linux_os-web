@@ -1,9 +1,10 @@
 // ============================================================
-// Desktop — Wallpaper + draggable desktop icons + context menu
+// Desktop — Wallpaper + draggable desktop icons + file drop
 // ============================================================
 
 import { useCallback, memo, useState, useRef } from 'react';
 import { useOS } from '@/hooks/useOSStore';
+import { idbSetBlob } from '@/hooks/useIndexedDB';
 import * as Icons from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 
@@ -20,6 +21,7 @@ const Desktop = memo(function Desktop() {
   const { desktopIcons, theme } = state;
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isDragOver, setIsDragOver] = useState(false);
   const desktopRef = useRef<HTMLDivElement>(null);
 
   const handleIconDoubleClick = useCallback(
@@ -70,6 +72,53 @@ const Desktop = memo(function Desktop() {
     setDraggingId(null);
   }, []);
 
+  // ---- File Drag & Drop ----
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragOver(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+
+    let uploaded = 0;
+    for (const file of files) {
+      try {
+        await idbSetBlob(`upload_${Date.now()}_${file.name}`, file);
+        uploaded++;
+      } catch (err) {
+        console.warn('[Desktop] File drop error:', err);
+      }
+    }
+
+    if (uploaded > 0) {
+      dispatch({
+        type: 'ADD_NOTIFICATION',
+        notification: {
+          title: 'Files Uploaded',
+          message: `${uploaded} file${uploaded > 1 ? 's' : ''} saved to Downloads`,
+          appId: 'filemanager',
+          appName: 'File Manager',
+          appIcon: 'Folder',
+          isRead: false,
+        },
+      });
+    }
+  }, [dispatch]);
+
   const handleDesktopContextMenu = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
@@ -116,7 +165,29 @@ const Desktop = memo(function Desktop() {
       onMouseUp={handleMouseUp}
       onContextMenu={handleDesktopContextMenu}
       onClick={() => dispatch({ type: 'SELECT_DESKTOP_ICON', id: null })}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
+      {/* File Drop Zone Overlay */}
+      {isDragOver && (
+        <div
+          className="absolute inset-4 z-50 flex items-center justify-center rounded-2xl pointer-events-none"
+          style={{
+            border: '3px dashed var(--accent-primary)',
+            background: 'rgba(124,77,255,0.08)',
+            backdropFilter: 'blur(4px)',
+            animation: 'dropZoneAppear 200ms ease',
+          }}
+        >
+          <div className="flex flex-col items-center gap-3">
+            <Icons.Upload size={48} className="text-[var(--accent-primary)]" style={{ animation: 'dropBounce 600ms infinite alternate ease-in-out' }} />
+            <span className="text-lg font-semibold text-[var(--accent-primary)]">Drop files here to upload</span>
+            <span className="text-xs text-[var(--text-secondary)]">Files will be saved to Downloads</span>
+          </div>
+        </div>
+      )}
+
       {/* Desktop Icons */}
       {desktopIcons.map((icon) => (
         <div
@@ -182,6 +253,14 @@ const Desktop = memo(function Desktop() {
         @keyframes iconAppear {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes dropZoneAppear {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes dropBounce {
+          from { transform: translateY(0); }
+          to { transform: translateY(-8px); }
         }
       `}</style>
     </div>

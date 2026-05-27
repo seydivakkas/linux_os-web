@@ -5,8 +5,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   CheckSquare, Plus, Calendar,
-  Trash2, Edit2, Check,
+  Trash2, Edit2, Check, Download, Tag, ChevronDown, ChevronRight,
 } from 'lucide-react';
+
+interface Subtask {
+  id: string;
+  title: string;
+  completed: boolean;
+}
 
 interface Task {
   id: string;
@@ -16,6 +22,8 @@ interface Task {
   priority: 'none' | 'low' | 'medium' | 'high';
   tags: string[];
   projectId: string;
+  description: string;
+  subtasks: Subtask[];
   createdAt: number;
 }
 
@@ -49,9 +57,9 @@ const loadTasks = (): Task[] => {
   } catch { /* ignore */ }
   const today = new Date().toISOString().split('T')[0];
   return [
-    { id: generateId(), title: 'Explore the UbuntuOS desktop', completed: false, dueDate: today, priority: 'high', tags: ['welcome'], projectId: 'inbox', createdAt: Date.now() },
-    { id: generateId(), title: 'Try the terminal app', completed: false, dueDate: today, priority: 'medium', tags: ['welcome'], projectId: 'inbox', createdAt: Date.now() - 10000 },
-    { id: generateId(), title: 'Customize your settings', completed: true, dueDate: today, priority: 'low', tags: [], projectId: 'inbox', createdAt: Date.now() - 20000 },
+    { id: generateId(), title: 'Explore the UbuntuOS desktop', completed: false, dueDate: today, priority: 'high', tags: ['welcome'], projectId: 'inbox', description: '', subtasks: [{ id: generateId(), title: 'Open the file manager', completed: true }, { id: generateId(), title: 'Try drag and drop', completed: false }], createdAt: Date.now() },
+    { id: generateId(), title: 'Try the terminal app', completed: false, dueDate: today, priority: 'medium', tags: ['welcome'], projectId: 'inbox', description: '', subtasks: [], createdAt: Date.now() - 10000 },
+    { id: generateId(), title: 'Customize your settings', completed: true, dueDate: today, priority: 'low', tags: [], projectId: 'inbox', description: '', subtasks: [], createdAt: Date.now() - 20000 },
   ];
 };
 
@@ -77,6 +85,9 @@ const Todo: React.FC = () => {
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'priority'>('date');
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [newSubtaskInput, setNewSubtaskInput] = useState<Record<string, string>>({});
+  const [newTagInput, setNewTagInput] = useState('');
 
   useEffect(() => {
     localStorage.setItem('ubuntuos_todos', JSON.stringify(tasks));
@@ -130,6 +141,8 @@ const Todo: React.FC = () => {
       priority: newTaskPriority,
       tags: [],
       projectId: selectedProject === 'today' || selectedProject === 'upcoming' || selectedProject === 'completed' ? 'inbox' : selectedProject,
+      description: '',
+      subtasks: [],
       createdAt: Date.now(),
     };
     setTasks(prev => [...prev, task]);
@@ -164,6 +177,52 @@ const Todo: React.FC = () => {
     if (projectId === 'upcoming') return tasks.filter(t => t.dueDate > today && !t.completed).length;
     if (projectId === 'completed') return tasks.filter(t => t.completed).length;
     return tasks.filter(t => t.projectId === projectId && !t.completed).length;
+  };
+
+  const toggleExpanded = (id: string) => {
+    setExpandedTasks(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  };
+
+  const addSubtask = (taskId: string) => {
+    const text = newSubtaskInput[taskId]?.trim();
+    if (!text) return;
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, subtasks: [...t.subtasks, { id: generateId(), title: text, completed: false }] } : t));
+    setNewSubtaskInput(prev => ({ ...prev, [taskId]: '' }));
+  };
+
+  const toggleSubtask = (taskId: string, subtaskId: string) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, subtasks: t.subtasks.map(s => s.id === subtaskId ? { ...s, completed: !s.completed } : s) } : t));
+  };
+
+  const deleteSubtask = (taskId: string, subtaskId: string) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, subtasks: t.subtasks.filter(s => s.id !== subtaskId) } : t));
+  };
+
+  const addTag = (taskId: string, tag: string) => {
+    if (!tag.trim()) return;
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, tags: [...new Set([...t.tags, tag.trim()])] } : t));
+  };
+
+  const removeTag = (taskId: string, tag: string) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, tags: t.tags.filter(tg => tg !== tag) } : t));
+  };
+
+  const exportCSV = () => {
+    let csv = 'Title,Status,Priority,Due Date,Tags,Subtasks\n';
+    tasks.forEach(t => {
+      csv += `"${t.title}",${t.completed ? 'Done' : 'Active'},${t.priority},${t.dueDate},"${t.tags.join(', ')}",${t.subtasks.length}\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'tasks.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportJSON = () => {
+    const blob = new Blob([JSON.stringify(tasks, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'tasks.json'; a.click();
+    URL.revokeObjectURL(url);
   };
 
   const allProjects = [...DEFAULT_PROJECTS, ...customProjects];
@@ -239,6 +298,12 @@ const Todo: React.FC = () => {
             >
               Sort: {sortBy}
             </button>
+            <button onClick={exportCSV} className="flex items-center gap-1 text-xs text-[var(--text-secondary)] px-2 py-1 rounded hover:bg-[var(--bg-hover)]" title="CSV Export">
+              <Download size={11} /> CSV
+            </button>
+            <button onClick={exportJSON} className="flex items-center gap-1 text-xs text-[var(--text-secondary)] px-2 py-1 rounded hover:bg-[var(--bg-hover)]" title="JSON Export">
+              <Download size={11} /> JSON
+            </button>
             {(['all', 'active', 'completed'] as const).map(f => (
               <button
                 key={f}
@@ -311,10 +376,9 @@ const Todo: React.FC = () => {
             </div>
           ) : (
             filteredTasks.map(task => (
+              <div key={task.id} className="border-b" style={{ borderColor: 'var(--border-subtle)' }}>
               <div
-                key={task.id}
-                className="flex items-center gap-3 px-4 py-2.5 border-b transition-colors group"
-                style={{ borderColor: 'var(--border-subtle)' }}
+                className="flex items-center gap-3 px-4 py-2.5 transition-colors group"
               >
                 {/* Priority indicator */}
                 <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: PRIORITY_COLORS[task.priority] }} />
@@ -364,11 +428,26 @@ const Todo: React.FC = () => {
                     {task.priority !== 'none' && (
                       <span className="text-[10px] capitalize" style={{ color: PRIORITY_COLORS[task.priority] }}>{task.priority}</span>
                     )}
+                    {task.subtasks.length > 0 && (
+                      <span className="text-[10px] text-[var(--text-disabled)]">
+                        {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
+                      </span>
+                    )}
+                    {task.tags.length > 0 && (
+                      <span className="text-[9px] px-1 rounded" style={{ background: 'var(--bg-selected)', color: 'var(--accent-primary)' }}>{task.tags[0]}{task.tags.length > 1 ? ` +${task.tags.length - 1}` : ''}</span>
+                    )}
                   </div>
                 </div>
 
                 {/* Actions */}
                 <div className="hidden group-hover:flex items-center gap-1">
+                  <button
+                    onClick={() => toggleExpanded(task.id)}
+                    className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
+                    title="Expand"
+                  >
+                    {expandedTasks.has(task.id) ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  </button>
                   <button
                     onClick={() => { setEditingTask(task.id); setEditTitle(task.title); }}
                     className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
@@ -382,6 +461,57 @@ const Todo: React.FC = () => {
                     <Trash2 size={12} />
                   </button>
                 </div>
+              </div>
+
+              {/* Expanded area: subtasks, tags */}
+              {expandedTasks.has(task.id) && (
+                <div className="pl-12 pr-4 pb-3 space-y-2">
+                  {/* Tags */}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <Tag size={10} className="text-[var(--text-disabled)]" />
+                    {task.tags.map(tag => (
+                      <span key={tag} className="px-1.5 py-0.5 rounded text-[9px] font-medium cursor-pointer hover:opacity-70"
+                        style={{ background: 'var(--bg-selected)', color: 'var(--accent-primary)' }}
+                        onClick={() => removeTag(task.id, tag)}>
+                        {tag} ×
+                      </span>
+                    ))}
+                    <input
+                      value={newTagInput}
+                      onChange={e => setNewTagInput(e.target.value)}
+                      placeholder="+ etiket"
+                      className="w-16 text-[9px] bg-transparent text-[var(--text-secondary)] outline-none"
+                      onKeyDown={e => { if (e.key === 'Enter' && newTagInput.trim()) { addTag(task.id, newTagInput); setNewTagInput(''); } }}
+                    />
+                  </div>
+
+                  {/* Subtasks */}
+                  <div className="space-y-1">
+                    {task.subtasks.map(sub => (
+                      <div key={sub.id} className="flex items-center gap-2 group/sub">
+                        <button onClick={() => toggleSubtask(task.id, sub.id)}
+                          className="w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0"
+                          style={{ borderColor: sub.completed ? 'var(--accent-success)' : 'var(--border-default)', background: sub.completed ? 'var(--accent-success)' : 'transparent' }}>
+                          {sub.completed && <Check size={8} className="text-white" />}
+                        </button>
+                        <span className={`text-[11px] flex-1 ${sub.completed ? 'line-through text-[var(--text-disabled)]' : 'text-[var(--text-primary)]'}`}>{sub.title}</span>
+                        <button onClick={() => deleteSubtask(task.id, sub.id)}
+                          className="opacity-0 group-hover/sub:opacity-100 text-[var(--text-disabled)] hover:text-[var(--accent-error)]"><Trash2 size={9} /></button>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-2">
+                      <Plus size={10} className="text-[var(--text-disabled)]" />
+                      <input
+                        value={newSubtaskInput[task.id] || ''}
+                        onChange={e => setNewSubtaskInput(prev => ({ ...prev, [task.id]: e.target.value }))}
+                        placeholder="Alt görev ekle..."
+                        className="flex-1 text-[10px] bg-transparent text-[var(--text-secondary)] outline-none"
+                        onKeyDown={e => { if (e.key === 'Enter') addSubtask(task.id); }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
               </div>
             ))
           )}

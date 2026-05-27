@@ -471,7 +471,7 @@ export default function Terminal() {
         if (!args[0]) {
           setLines(prev => [...prev, { type: 'output', text: `Available themes: ${themes.join(', ')}` }]);
         } else if (themes.includes(args[0])) {
-          osDispatch({ type: 'SET_THEME', theme: { colorTheme: args[0] } });
+          osDispatch({ type: 'SET_THEME', theme: { colorTheme: args[0] as any } });
           setLines(prev => [...prev, { type: 'system', text: `Theme changed to ${args[0]}` }]);
         } else {
           setLines(prev => [...prev, { type: 'error', text: `theme: unknown theme '${args[0]}'. Options: ${themes.join(', ')}` }]);
@@ -678,8 +678,59 @@ Rules:
     [currentPath, fs, clear, history, osDispatch, pendingAiCmd]
   );
 
+  // Tab completion
+  const handleTabComplete = useCallback(() => {
+    const parts = input.split(/\s+/);
+    if (parts.length <= 1) {
+      // Complete command name
+      const partial = parts[0].toLowerCase();
+      const cmdNames = Object.keys(COMMANDS);
+      const matches = cmdNames.filter(c => c.startsWith(partial));
+      if (matches.length === 1) {
+        setInput(matches[0] + ' ');
+      } else if (matches.length > 1) {
+        setLines(prev => [...prev,
+          { type: 'input', text: `${currentPath}$ ${input}` },
+          { type: 'output', text: matches.join('  ') },
+        ]);
+      }
+    } else {
+      // Complete file/folder name
+      const partial = parts[parts.length - 1];
+      const currentNode = fs.findNodeByPath(currentPath);
+      if (currentNode) {
+        const children = fs.getChildren(currentNode.id);
+        const matches = children.filter(c => c.name.toLowerCase().startsWith(partial.toLowerCase()));
+        if (matches.length === 1) {
+          parts[parts.length - 1] = matches[0].name + (matches[0].type === 'folder' ? '/' : '');
+          setInput(parts.join(' '));
+        } else if (matches.length > 1) {
+          setLines(prev => [...prev,
+            { type: 'input', text: `${currentPath}$ ${input}` },
+            { type: 'output', text: matches.map(m => m.name).join('  ') },
+          ]);
+          // Auto-complete common prefix
+          const common = matches.reduce((acc, m) => {
+            let i = 0;
+            while (i < acc.length && i < m.name.length && acc[i] === m.name[i]) i++;
+            return acc.slice(0, i);
+          }, matches[0].name);
+          if (common.length > partial.length) {
+            parts[parts.length - 1] = common;
+            setInput(parts.join(' '));
+          }
+        }
+      }
+    }
+  }, [input, currentPath, fs]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        handleTabComplete();
+        return;
+      }
       if (e.key === 'Enter') {
         // Handle pending AI command confirmation
         if (pendingAiCmd && (input.toLowerCase() === 'y' || input.toLowerCase() === 'yes')) {

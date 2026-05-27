@@ -1,71 +1,109 @@
 // ============================================================
-// BootSequence — 4-phase animated boot
+// BootSequence — 5-phase animated boot with kernel-style logs
+// Phase 0: BIOS/UEFI splash (SVG logo)
+// Phase 1: Kernel log stream (dmesg-style)
+// Phase 2: Loading bar with service init
+// Phase 3: Transition (circle clip)
+// Phase 4: Desktop reveal
 // ============================================================
 
-import { useEffect, useState, memo } from 'react';
+import { useEffect, useState, memo, useRef } from 'react';
 
-const PHASE_LOGO = 0;
-const PHASE_LOADING = 1;
-const PHASE_TRANSITION = 2;
-const PHASE_DESKTOP = 3;
-const PHASE_DONE = 4;
+const PHASE_BIOS = 0;
+const PHASE_KERNEL = 1;
+const PHASE_LOADING = 2;
+const PHASE_TRANSITION = 3;
+const PHASE_DESKTOP = 4;
+const PHASE_DONE = 5;
+
+const KERNEL_LOGS = [
+  '[    0.000000] LinuxOS Web kernel 6.2.0-web (info@linuxos.dev)',
+  '[    0.000001] BIOS-e820: [mem 0x0000000000000000-0x000000000009ffff] usable',
+  '[    0.000012] ACPI: RSDP 0x00000000000F0490 000024 (v02 VBOX  )',
+  '[    0.000045] CPU: Virtual Web Core @ 3.40GHz',
+  '[    0.000078] Memory: 4096MB/4096MB available (browser allocated)',
+  '[    0.000123] Calibrating delay loop... 6800.00 BogoMIPS (lpj=3400000)',
+  '[    0.000234] pid_max: default: 32768 minimum: 301',
+  '[    0.000456] Mount-cache hash table entries: 1024',
+  '[    0.000678] CPU: x86_64 Virtual (1 CPU)',
+  '[    0.001000] Initializing IndexedDB subsystem...',
+  '[    0.001200] [VFS] Mounting virtual filesystem...',
+  '[    0.001500] [VFS] Registering file associations...',
+  '[    0.002000] [NET] Initializing network stack (Service Workers)...',
+  '[    0.002500] [GPU] WebGL 2.0 renderer initialized',
+  '[    0.003000] [AUDIO] Web Audio API context created',
+  '[    0.003500] [I18N] Loading locale: auto-detect...',
+  '[    0.004000] [WM] Window Manager ready (tiling + floating)',
+  '[    0.004500] [DOCK] Application dock initialized',
+  '[    0.005000] systemd[1]: Starting LinuxOS Web Desktop...',
+  '[    0.005500] systemd[1]: Started 57 application services.',
+  '[    0.006000] systemd[1]: Reached target Graphical Interface.',
+];
 
 const BootSequence = memo(function BootSequence({ onComplete }: { onComplete: () => void }) {
-  const [phase, setPhase] = useState<number>(PHASE_LOGO);
+  const [phase, setPhase] = useState<number>(PHASE_BIOS);
   const [progress, setProgress] = useState(0);
   const [loadingText, setLoadingText] = useState('Loading system...');
+  const [visibleLogs, setVisibleLogs] = useState<number>(0);
+  const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
 
-    timers.push(
-      setTimeout(() => {
-        setPhase(PHASE_LOADING);
-      }, 800)
-    );
+    // Phase 0 → 1: BIOS to Kernel (after 600ms)
+    timers.push(setTimeout(() => setPhase(PHASE_KERNEL), 600));
 
-    timers.push(
-      setTimeout(() => {
-        let p = 0;
-        const interval = setInterval(() => {
-          p += Math.random() * 15 + 5;
-          if (p >= 100) {
-            p = 100;
-            clearInterval(interval);
-          }
-          setProgress(p);
-          if (p > 30) setLoadingText('Initializing services...');
-          if (p > 70) setLoadingText('Preparing desktop...');
-        }, 120);
-        timers.push(interval as unknown as ReturnType<typeof setTimeout>);
-      }, 800)
-    );
+    // Phase 1: Stream kernel logs
+    KERNEL_LOGS.forEach((_, i) => {
+      timers.push(setTimeout(() => {
+        setVisibleLogs(i + 1);
+      }, 600 + i * 80));
+    });
 
-    timers.push(
-      setTimeout(() => {
-        setPhase(PHASE_TRANSITION);
-      }, 2600)
-    );
+    // Phase 1 → 2: Kernel to Loading (after all logs)
+    const kernelEnd = 600 + KERNEL_LOGS.length * 80 + 200;
+    timers.push(setTimeout(() => setPhase(PHASE_LOADING), kernelEnd));
 
-    timers.push(
-      setTimeout(() => {
-        setPhase(PHASE_DESKTOP);
-      }, 3400)
-    );
+    // Phase 2: Progress bar
+    timers.push(setTimeout(() => {
+      let p = 0;
+      const interval = setInterval(() => {
+        p += Math.random() * 18 + 6;
+        if (p >= 100) {
+          p = 100;
+          clearInterval(interval);
+        }
+        setProgress(p);
+        if (p > 30) setLoadingText('Initializing services...');
+        if (p > 60) setLoadingText('Starting window manager...');
+        if (p > 85) setLoadingText('Preparing desktop...');
+      }, 100);
+      timers.push(interval as unknown as ReturnType<typeof setTimeout>);
+    }, kernelEnd));
 
-    timers.push(
-      setTimeout(() => {
-        setPhase(PHASE_DONE);
-        onComplete();
-      }, 4200)
-    );
+    // Phase 2 → 3: Loading to Transition
+    timers.push(setTimeout(() => setPhase(PHASE_TRANSITION), kernelEnd + 1400));
+
+    // Phase 3 → 4: Transition to Desktop
+    timers.push(setTimeout(() => setPhase(PHASE_DESKTOP), kernelEnd + 2200));
+
+    // Phase 4 → Done
+    timers.push(setTimeout(() => {
+      setPhase(PHASE_DONE);
+      onComplete();
+    }, kernelEnd + 3000));
 
     return () => timers.forEach((t) => clearTimeout(t));
   }, [onComplete]);
 
-  if (phase === PHASE_DONE) return null;
+  // Auto-scroll kernel logs
+  useEffect(() => {
+    if (logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+    }
+  }, [visibleLogs]);
 
-  const showContent = phase === PHASE_LOGO || phase === PHASE_LOADING || phase === PHASE_TRANSITION;
+  if (phase === PHASE_DONE) return null;
 
   return (
     <div
@@ -87,80 +125,131 @@ const BootSequence = memo(function BootSequence({ onComplete }: { onComplete: ()
         />
       )}
 
-      {showContent && (
+      {/* BIOS Phase — Logo */}
+      {phase === PHASE_BIOS && (
         <div
-          className="flex flex-col items-center justify-center relative z-10"
-          style={{
-            opacity: phase === PHASE_TRANSITION ? 0 : 1,
-            transition: 'opacity 400ms ease',
-          }}
+          className="flex flex-col items-center gap-6"
+          style={{ animation: 'fadeIn 400ms ease' }}
         >
+          <div style={{ animation: 'logoPulse 1.2s ease-in-out infinite' }}>
+            <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+              <defs>
+                <linearGradient id="bootGrad1" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#7C4DFF" />
+                  <stop offset="100%" stopColor="#E040FB" />
+                </linearGradient>
+                <linearGradient id="bootGrad2" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#FF9800" />
+                  <stop offset="100%" stopColor="#FF5722" />
+                </linearGradient>
+              </defs>
+              <circle cx="48" cy="48" r="46" fill="url(#bootGrad1)" opacity="0.9" />
+              <circle cx="34" cy="40" r="16" fill="url(#bootGrad2)" opacity="0.85" />
+              <circle cx="58" cy="56" r="14" fill="#E91E63" opacity="0.7" />
+            </svg>
+          </div>
+          <h1 className="text-[32px] font-bold tracking-[0.12em] text-white/90">
+            LinuxOS
+          </h1>
+          <p className="text-[10px] text-white/30 tracking-widest uppercase">
+            Web Desktop Environment
+          </p>
+        </div>
+      )}
+
+      {/* Kernel Log Phase */}
+      {phase === PHASE_KERNEL && (
+        <div
+          ref={logRef}
+          className="w-full max-w-[700px] h-[300px] overflow-hidden px-6"
+          style={{ animation: 'fadeIn 200ms ease' }}
+        >
+          {KERNEL_LOGS.slice(0, visibleLogs).map((log, i) => (
+            <div
+              key={i}
+              className="text-[11px] leading-[1.6] font-mono whitespace-pre"
+              style={{
+                color: log.includes('[VFS]') || log.includes('[NET]') || log.includes('[GPU]')
+                  ? '#4CAF50'
+                  : log.includes('systemd')
+                    ? '#7C4DFF'
+                    : log.includes('[I18N]') || log.includes('[WM]') || log.includes('[DOCK]') || log.includes('[AUDIO]')
+                      ? '#00BCD4'
+                      : '#8a8a8a',
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                animation: 'logLine 150ms ease',
+              }}
+            >
+              {log}
+            </div>
+          ))}
           <div
-            className="mb-4"
-            style={{
-              opacity: phase >= PHASE_LOGO ? 1 : 0,
-              transform: `scale(${phase >= PHASE_LOGO ? 1 : 0.8})`,
-              filter: phase >= PHASE_LOGO ? 'blur(0px)' : 'blur(8px)',
-              transition: 'all 600ms cubic-bezier(0, 0, 0.2, 1)',
-              animation: phase === PHASE_LOADING ? 'pulse 1.6s ease-in-out infinite' : undefined,
-            }}
-          >
-            <svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="48" cy="48" r="46" fill="#7C4DFF" opacity="0.9" />
+            className="inline-block w-2 h-4 bg-white/60 ml-1"
+            style={{ animation: 'blink 800ms step-end infinite' }}
+          />
+        </div>
+      )}
+
+      {/* Loading Phase — Progress Bar */}
+      {(phase === PHASE_LOADING) && (
+        <div
+          className="flex flex-col items-center gap-6"
+          style={{ animation: 'fadeIn 300ms ease' }}
+        >
+          <div style={{ animation: 'logoPulse 1.6s ease-in-out infinite' }}>
+            <svg width="72" height="72" viewBox="0 0 96 96" fill="none">
+              <defs>
+                <linearGradient id="loadGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#7C4DFF" />
+                  <stop offset="100%" stopColor="#E040FB" />
+                </linearGradient>
+              </defs>
+              <circle cx="48" cy="48" r="46" fill="url(#loadGrad)" opacity="0.9" />
               <circle cx="34" cy="40" r="16" fill="#FF9800" opacity="0.85" />
               <circle cx="58" cy="56" r="14" fill="#E91E63" opacity="0.7" />
             </svg>
           </div>
 
-          <h1
-            className="text-[28px] font-bold tracking-[0.1em] text-[#E0E0E0] mb-6"
-            style={{
-              opacity: phase >= PHASE_LOGO ? 1 : 0,
-              transform: `translateY(${phase >= PHASE_LOGO ? 0 : 10}px)`,
-              transition: 'all 400ms cubic-bezier(0, 0, 0.2, 1) 400ms',
-            }}
-          >
-            UbuntuOS
+          <h1 className="text-[24px] font-bold tracking-[0.1em] text-white/90">
+            LinuxOS
           </h1>
 
-          {phase >= PHASE_LOADING && (
+          <div
+            className="w-[240px] h-[3px] rounded-full overflow-hidden"
+            style={{ background: 'rgba(124,77,255,0.2)' }}
+          >
             <div
-              className="w-[200px] h-[3px] rounded-full overflow-hidden mb-3"
+              className="h-full rounded-full"
               style={{
-                background: 'rgba(124,77,255,0.2)',
-                opacity: phase >= PHASE_LOADING ? 1 : 0,
-                transition: 'opacity 200ms ease',
+                width: `${progress}%`,
+                background: 'linear-gradient(90deg, #7C4DFF, #E040FB)',
+                transition: 'width 100ms linear',
               }}
-            >
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${progress}%`,
-                  background: '#7C4DFF',
-                  transition: 'width 100ms linear',
-                }}
-              />
-            </div>
-          )}
+            />
+          </div>
 
-          {phase >= PHASE_LOADING && (
-            <p
-              className="text-[10px] text-[#9E9E9E] tracking-wider"
-              style={{
-                opacity: phase >= PHASE_LOADING ? 1 : 0,
-                transition: 'opacity 300ms ease',
-              }}
-            >
-              {loadingText}
-            </p>
-          )}
+          <p className="text-[10px] text-white/40 tracking-wider">
+            {loadingText}
+          </p>
         </div>
       )}
 
       <style>{`
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.05); }
+        @keyframes logoPulse {
+          0%, 100% { transform: scale(1); filter: brightness(1); }
+          50% { transform: scale(1.04); filter: brightness(1.1); }
+        }
+        @keyframes logLine {
+          from { opacity: 0; transform: translateY(2px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
       `}</style>
     </div>

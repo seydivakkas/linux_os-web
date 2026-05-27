@@ -64,18 +64,26 @@ const loadDesktopIcons = (): DesktopIcon[] => {
   return defaultDesktopIcons;
 };
 
+const loadTheme = () => {
+  try {
+    const saved = localStorage.getItem('ubuntuos_theme');
+    if (saved) return JSON.parse(saved);
+  } catch { /* ignore */ }
+  return {
+    mode: 'dark',
+    accent: '#7C4DFF',
+    wallpaper: '/wallpaper-default.jpg',
+    colorTheme: 'default',
+  };
+};
+
 const initialState: OSState = {
   bootPhase: 'off',
   auth: { isAuthenticated: false, isGuest: false, userName: 'User' },
   windows: [],
   apps: APP_REGISTRY,
   desktopIcons: loadDesktopIcons(),
-  theme: {
-    mode: 'dark',
-    accent: '#7C4DFF',
-    wallpaper: '/wallpaper-default.jpg',
-    colorTheme: 'default',
-  },
+  theme: loadTheme(),
   notifications: [],
   dockItems: createInitialDockItems(),
   contextMenu: {
@@ -103,7 +111,11 @@ function osReducer(state: OSState, action: OSAction): OSState {
     case 'LOGIN': {
       return {
         ...state,
-        auth: { isAuthenticated: true, isGuest: action.isGuest, userName: action.isGuest ? 'Guest' : 'User' },
+        auth: {
+          isAuthenticated: true,
+          isGuest: action.isGuest,
+          userName: action.userName || (action.isGuest ? 'Guest' : 'User'),
+        },
         bootPhase: 'desktop',
       };
     }
@@ -446,6 +458,77 @@ function osReducer(state: OSState, action: OSAction): OSState {
       };
     }
 
+    case 'TILE_HORIZONTAL': {
+      const visible = state.windows.filter((w) => w.state !== 'minimized');
+      if (visible.length === 0) return state;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight - TOP_PANEL_HEIGHT - 48;
+      const tileW = vw / visible.length;
+      let z = state.nextZIndex;
+      const updated = state.windows.map((w) => {
+        const idx = visible.indexOf(w);
+        if (idx === -1) return w;
+        return {
+          ...w,
+          state: 'normal' as WindowState,
+          position: { x: idx * tileW, y: TOP_PANEL_HEIGHT },
+          size: { width: tileW, height: vh },
+          zIndex: z++,
+          isFocused: idx === visible.length - 1,
+        };
+      });
+      return { ...state, windows: updated, nextZIndex: z, activeWindowId: visible[visible.length - 1]?.id ?? null };
+    }
+
+    case 'TILE_VERTICAL': {
+      const visible = state.windows.filter((w) => w.state !== 'minimized');
+      if (visible.length === 0) return state;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight - TOP_PANEL_HEIGHT - 48;
+      const tileH = vh / visible.length;
+      let z = state.nextZIndex;
+      const updated = state.windows.map((w) => {
+        const idx = visible.indexOf(w);
+        if (idx === -1) return w;
+        return {
+          ...w,
+          state: 'normal' as WindowState,
+          position: { x: 0, y: TOP_PANEL_HEIGHT + idx * tileH },
+          size: { width: vw, height: tileH },
+          zIndex: z++,
+          isFocused: idx === visible.length - 1,
+        };
+      });
+      return { ...state, windows: updated, nextZIndex: z, activeWindowId: visible[visible.length - 1]?.id ?? null };
+    }
+
+    case 'TILE_GRID': {
+      const visible = state.windows.filter((w) => w.state !== 'minimized');
+      if (visible.length === 0) return state;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight - TOP_PANEL_HEIGHT - 48;
+      const cols = Math.ceil(Math.sqrt(visible.length));
+      const rows = Math.ceil(visible.length / cols);
+      const tileW = vw / cols;
+      const tileH = vh / rows;
+      let z = state.nextZIndex;
+      const updated = state.windows.map((w) => {
+        const idx = visible.indexOf(w);
+        if (idx === -1) return w;
+        const col = idx % cols;
+        const row = Math.floor(idx / cols);
+        return {
+          ...w,
+          state: 'normal' as WindowState,
+          position: { x: col * tileW, y: TOP_PANEL_HEIGHT + row * tileH },
+          size: { width: tileW, height: tileH },
+          zIndex: z++,
+          isFocused: idx === visible.length - 1,
+        };
+      });
+      return { ...state, windows: updated, nextZIndex: z, activeWindowId: visible[visible.length - 1]?.id ?? null };
+    }
+
     default:
       return state;
   }
@@ -461,6 +544,51 @@ const OSContext = createContext<OSContextType | null>(null);
 
 export const OSProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(osReducer, initialState);
+
+  // Save theme
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('ubuntuos_theme', JSON.stringify(state.theme));
+    } catch { /* ignore */ }
+  }, [state.theme]);
+
+  // Save session (open windows) — for restore on reload
+  React.useEffect(() => {
+    if (!state.auth.isAuthenticated || state.windows.length === 0) return;
+    try {
+      const session = state.windows.map(w => ({
+        appId: w.appId,
+        title: w.title,
+        position: w.position,
+        size: w.size,
+        state: w.state,
+      }));
+      localStorage.setItem('ubuntuos_session', JSON.stringify(session));
+    } catch { /* ignore */ }
+  }, [state.windows, state.auth.isAuthenticated]);
+
+  // Save desktop icon positions
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('ubuntuos_desktop_icons', JSON.stringify(state.desktopIcons));
+    } catch { /* ignore */ }
+  }, [state.desktopIcons]);
+
+  // Restore session on login
+  React.useEffect(() => {
+    if (!state.auth.isAuthenticated || state.windows.length > 0) return;
+    try {
+      const saved = localStorage.getItem('ubuntuos_session');
+      if (saved) {
+        const session = JSON.parse(saved) as { appId: string; title?: string }[];
+        // Re-open saved windows (limit to 5 to avoid spam)
+        session.slice(0, 5).forEach(w => {
+          dispatch({ type: 'OPEN_WINDOW', appId: w.appId, title: w.title });
+        });
+      }
+    } catch { /* ignore */ }
+  }, [state.auth.isAuthenticated]);
+
   return (
     <OSContext.Provider value={{ state, dispatch }}>
       {children}
